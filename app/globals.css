@@ -1,26 +1,20 @@
+/*
+================================================================================
+  IEDC CARMEL - "EMBER & STEEL" BRAND THEME
+================================================================================
+*/
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* This section allows Tailwind to recognize the CSS variables. No changes needed here. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -43,73 +37,64 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ☀️ LIGHT MODE THEME ====================================================== */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --radius: 0.75rem; /* A slightly more modern, rounded look */
+
+  /* --- Neutrals (Steel) --- */
+  --background: oklch(0.98 0.005 240);       /* Very light, almost white cool gray */
+  --foreground: oklch(0.15 0.02 240);       /* Very dark, near-black cool gray for text */
+  --card: oklch(1 0 0);                     /* Pure white for cards to pop */
+  --card-foreground: oklch(0.15 0.02 240);  /* Dark text on cards */
+  --popover: oklch(1 0 0);                  /* Popovers are white */
+  --popover-foreground: oklch(0.15 0.02 240);
+
+  /* --- Primary Action Color (Ember) --- */
+  --primary: oklch(69.96% 0.202 44.43);       /* Your vibrant orange-red */
+  --primary-foreground: oklch(0.98 0.005 44.43); /* High-contrast light text for primary buttons */
+
+  /* --- Secondary & Accent (Volt) --- */
+  --secondary: oklch(0.94 0.01 240);         /* A subtle light gray for secondary elements */
+  --secondary-foreground: oklch(0.2 0.02 240);/* Dark text for secondary elements */
+  --accent: oklch(70.09% 0.20117 44.755 / 0.622);            /* A striking, cool teal/blue accent */
+  --accent-foreground: oklch(0.1 0.02 195);  /* Dark text for accents */
+
+  /* --- Functional Colors --- */
+  --muted: oklch(0.94 0.01 240);             /* Muted gray for less important elements */
+  --muted-foreground: oklch(0.45 0.02 240);  /* Softer text for muted content */
+  --border: oklch(0.90 0.01 240);            /* A subtle border color */
+  --input: oklch(0.90 0.01 240);             /* Input background color */
+  --ring: oklch(69.96% 0.202 44.43 / 50%);  /* A semi-transparent ring using the primary color */
+  --destructive: oklch(0.65 0.22 25);         /* A clear, unambiguous red for destructive actions */
 }
 
+/* 🌙 DARK MODE THEME ======================================================= */
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  /* --- Neutrals (Steel) --- */
+  --background: oklch(0.1 0.02 240);         /* A very deep, near-black cool gray */
+  --foreground: oklch(0.95 0.01 240);       /* A soft, off-white for text */
+  --card: oklch(0.15 0.02 240);             /* Cards are slightly lighter than the background */
+  --card-foreground: oklch(0.95 0.01 240);  /* Soft white text on cards */
+  --popover: oklch(0.12 0.02 240);          /* Popovers are slightly darker than cards */
+  --popover-foreground: oklch(0.95 0.01 240);
+
+  /* --- Primary Action Color (Ember) --- */
+  --primary: oklch(69.96% 0.202 44.43);       /* The vibrant orange-red remains the star */
+  --primary-foreground: oklch(0.98 0.005 44.43); /* High-contrast light text on primary buttons */
+
+  /* --- Secondary & Accent (Volt) --- */
+  --secondary: oklch(0.2 0.02 240);          /* A darker gray for secondary elements */
+  --secondary-foreground: oklch(0.95 0.01 240);/* Soft white text for secondary elements */
+  --accent: oklch(69.96% 0.202 44.43);            /* The electric teal/blue pops on the dark background */
+  --accent-foreground: oklch(100% 0.00011 271.152);  /* Dark text for accents */
+
+  /* --- Functional Colors --- */
+  --muted: oklch(0.2 0.02 240);              /* Muted dark gray */
+  --muted-foreground: oklch(0.65 0.02 240);  /* Lighter, muted text */
+  --border: oklch(0.2 0.02 240);             /* A subtle border that blends in */
+  --input: oklch(0.2 0.02 240);              /* Input background */
+  --ring: oklch(69.96% 0.202 44.43 / 50%);   /* A semi-transparent ring */
+  --destructive: oklch(0.70 0.25 25);          /* A brighter red for dark mode contrast */
 }
 
 @layer base {
