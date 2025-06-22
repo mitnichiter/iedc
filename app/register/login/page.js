@@ -118,7 +118,7 @@ export default function LoginPage() {
       </Card>
       {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
       <div className="mt-4 text-center text-sm">
-        Don't have an account?{' '}<Link href="/register" className="underline font-semibold">Register</Link>
+        Don&apos;t have an account?{' '}<Link href="/register" className="underline font-semibold">Register</Link>
       </div>
     </main>
   );

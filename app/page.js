@@ -97,7 +97,7 @@ export default function HomePage() {
             <div className="container mx-auto px-4 md:px-6">
                 <div className="mx-auto max-w-3xl text-center">
                     {/* THIS IS NOW ON-BRAND */}
-                    <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">Don't Miss Out</div>
+                    <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">Don&apos;t Miss Out</div>
                     <h2 className="mt-2 text-3xl font-bold tracking-tighter sm:text-4xl">Upcoming Events</h2>
                     <p className="mt-4 text-muted-foreground md:text-lg">Join our workshops, hackathons, and speaker sessions to learn, build, and connect.</p>
                 </div>
