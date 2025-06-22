@@ -100,11 +100,11 @@ export default function RegisterPage() {
   const isOtherInterestSelected = selectedInterests.includes('Other');
 
   return (
-  <main className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-[#000408] p-4">
+  <main className="blueprint-background flex items-center justify-center min-h-screen bg-gray-100 dark:bg-[#000408] px-4 py-8 sm:px-6 lg:px-8">
     <div>
-      <Card className="w-[800px] max-w-full shadow-lg rounded-2xl"> {/* <-- CHANGED LINE */}
+      <Card className="w-full max-w-full lg:min-w-[800px] lg:max-w-[900px] mx-auto px-4 shadow-lg rounded-2xl"> {/* <-- CHANGED LINE */}
         <CardHeader>
-          <CardTitle>IEDC Registration</CardTitle>
+          <CardTitle className='text-xl sm:text-2xl'>IEDC Registration</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"> {/* <-- CHANGED LINE */}
@@ -113,7 +113,7 @@ export default function RegisterPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullname">Full Name</Label>
-                <Input id="fullname" placeholder="Sanjay S" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <Input id="fullname" placeholder="Mitnic Hiter" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -198,7 +198,7 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
 
-      <div className="mt-4 text-center text-sm">
+      <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
         Already have an account?{' '}
         <Link href="/register/login" className="underline font-semibold">
           Sign in

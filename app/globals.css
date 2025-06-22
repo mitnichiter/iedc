@@ -105,3 +105,40 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Defines the animation that slowly pans the background */
+@keyframes pan-background {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 200% 200%;
+  }
+}
+
+/* This is the main class we will apply to our pages */
+.blueprint-background {
+  /* Link the animation to our class */
+  animation: pan-background 60s linear infinite;
+
+  /* We use multiple background layers, separated by commas */
+  background-image:
+    /* Layer 1: Glowing Nodes/Intersections (The "Ember") */
+    radial-gradient(circle at center, oklch(from var(--primary) l c h / 60%) 0, transparent 3px),
+
+    /* Layer 2: Main Grid Lines */
+    linear-gradient(to right, oklch(from var(--border) l c h / 40%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(from var(--border) l c h / 40%) 1px, transparent 1px),
+    
+    /* Layer 3: Faint Detail Grid for texture */
+    linear-gradient(to right, oklch(from var(--border) l c h / 20%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(from var(--border) l c h / 20%) 1px, transparent 1px);
+
+  /* Define the size of each background layer */
+  background-size:
+    8rem 8rem,  /* Glowing nodes are spaced far apart */
+    4rem 4rem,  /* Main grid size */
+    4rem 4rem,
+    1rem 1rem,  /* Detail grid size */
+    1rem 1rem;
+}
