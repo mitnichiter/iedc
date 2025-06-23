@@ -103,3 +103,105 @@ exports.verifyEmailOtp = functions.https.onCall(async (data, context) => {
     await otpDocRef.delete();
     return { success: true };
 });
+
+// Function to send OTP for new user registration (callable)
+exports.sendRegistrationEmailOtp = functions.https.onCall(async (data, context) => {
+  // 1. Data Validation
+  const email = data.email;
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { // Basic email validation
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "A valid email address must be provided."
+    );
+  }
+
+  // 2. Generate and save OTP
+  // We'll use the email itself as the document ID in a new collection for registration OTPs
+  // This avoids needing a userId before the user is created.
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiration = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  try {
+    // Using a separate collection for registration OTPs
+    await admin.firestore().collection("registrationOtps").doc(email).set({
+      otp,
+      email, // Storing email again for clarity, though it's the doc ID
+      expires: expiration,
+      verified: false, // Add a verified flag
+    });
+  } catch (error) {
+    console.error("Firestore write error (registrationOtps):", error);
+    throw new functions.https.HttpsError("internal", "Failed to save OTP for registration.");
+  }
+
+  // 3. Send Email
+  const mailOptions = {
+    from: `IEDC Carmel <${gmailEmail}>`,
+    to: email,
+    subject: "Verify Your Email for IEDC Registration",
+    html: `<p>Your email verification code is: <strong>${otp}</strong>. This code will expire in 10 minutes.</p>`,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true, message: "Verification code sent to your email." };
+  } catch (error) {
+    console.error("Nodemailer transport error (registration):", error);
+    throw new functions.https.HttpsError("internal", "Failed to send verification email.");
+  }
+});
+
+// Function to verify OTP for new user registration (callable)
+exports.verifyRegistrationEmailOtp = functions.https.onCall(async (data, context) => {
+  const { email, otp } = data;
+
+  if (!email || !otp) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Email and OTP must be provided."
+    );
+  }
+
+  const otpDocRef = admin.firestore().collection("registrationOtps").doc(email);
+  const otpDoc = await otpDocRef.get();
+
+  if (!otpDoc.exists) {
+    throw new functions.https.HttpsError(
+      "not-found",
+      "OTP not found for this email. It may have expired or never been sent."
+    );
+  }
+
+  const { otp: storedOtp, expires, verified } = otpDoc.data();
+
+  if (verified) { // If already verified, perhaps by a concurrent request
+    return { success: true, message: "Email already verified." };
+  }
+
+  if (new Date() > expires.toDate()) {
+    await otpDocRef.delete(); // Clean up expired OTP
+    throw new functions.https.HttpsError(
+      "deadline-exceeded",
+      "OTP has expired. Please request a new one."
+    );
+  }
+
+  if (storedOtp !== otp) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Invalid OTP provided."
+    );
+  }
+
+  // Mark OTP as verified in Firestore
+  try {
+    await otpDocRef.update({ verified: true });
+    // We don't delete it immediately, to prevent re-use until user creation or another cleanup process.
+    // Or, we could delete it if user creation is guaranteed to happen right after.
+    // For now, just marking as verified.
+    return { success: true, message: "OTP verified successfully." };
+  } catch (error) {
+    console.error("Firestore update error (registrationOtps verification):", error);
+    throw new functions.https.HttpsError("internal", "Failed to update OTP status.");
+  }
+});
