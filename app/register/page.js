@@ -133,10 +133,6 @@ export default function RegisterPage() {
                 <Label htmlFor="dob">Date of Birth</Label>
                 <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
               </div>
-              <div className="space-y-2"> {/* <-- ADD THIS BLOCK --> */}
-                <Label htmlFor="registerNumber">Register Number</Label>
-                <Input id="registerNumber" placeholder="Enter Register Number" value={registerNumber} onChange={(e) => setRegisterNumber(e.target.value)} />
-              </div>
             </div>
 
             {/* --- RIGHT COLUMN --- */}
@@ -174,6 +170,10 @@ export default function RegisterPage() {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="registerNumber">Register Number</Label>
+                <Input id="registerNumber" placeholder="Enter Register Number" value={registerNumber} onChange={(e) => setRegisterNumber(e.target.value)} />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="interests">Interests</Label>
                 <MultiSelect
                   options={interestOptions}
@@ -182,19 +182,20 @@ export default function RegisterPage() {
                   className="w-full"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="other-interest">If Other, please specify</Label>
-                <Input
-                  id="other-interest"
-                  placeholder="e.g., AI/ML"
-                  value={otherInterest}
-                  onChange={(e) => setOtherInterest(e.target.value)}
-                  disabled={!isOtherInterestSelected}
-                  className={!isOtherInterestSelected ? "bg-gray-100 dark:bg-gray-800" : ""}
-                />
-              </div>
             </div>
 
+            {/* --- FULL WIDTH ROW FOR OTHER INTEREST --- */}
+            <div className="md:col-span-2 space-y-2"> {/* <-- MODIFIED LINE to span 2 columns on medium screens and up */}
+              <Label htmlFor="other-interest">If Other, please specify</Label>
+              <Input
+                id="other-interest"
+                placeholder="e.g., AI/ML"
+                value={otherInterest}
+                onChange={(e) => setOtherInterest(e.target.value)}
+                disabled={!isOtherInterestSelected}
+                className={!isOtherInterestSelected ? "bg-gray-100 dark:bg-gray-800" : ""}
+              />
+            </div>
           </form>
         </CardContent>
         <CardFooter>
