@@ -95,7 +95,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">IEDC Login</CardTitle>
           <CardDescription>
-            {loginStep === 'credentials' ? "Sign in to continue." : "We've sent a code to your email."}
+            {loginStep === 'credentials' ? "Sign in to continue." : "We&apos;ve sent a code to your email."}
           </CardDescription>
         </CardHeader>
         {loginStep === 'credentials' ? (

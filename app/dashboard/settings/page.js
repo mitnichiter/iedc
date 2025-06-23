@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Edit, LogOut, User, Settings as SettingsIcon, ChevronLeft } from "lucide-react"; // Added SettingsIcon, ChevronLeft
+import { Edit, LogOut, User, Settings as SettingsIcon, ChevronLeft, Sun, Moon, Laptop } from "lucide-react"; // Added Sun, Moon, Laptop
 import Link from 'next/link';
+import { useTheme } from "next-themes"; // Import useTheme
 
 // --- Interest Options (ensure this is consistent or centralized if used elsewhere) ---
 const interestOptions = [
@@ -48,6 +49,7 @@ const SettingsPageContent = () => {
   const [updateMessage, setUpdateMessage] = useState("");
   const [updateError, setUpdateError] = useState("");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const { theme, setTheme } = useTheme();
 
 
   useEffect(() => {
@@ -266,6 +268,28 @@ const SettingsPageContent = () => {
             <div className="p-6 bg-card rounded-lg shadow">
               <h3 className="text-xl font-medium mb-4">Security</h3>
               <p className="text-muted-foreground text-sm">Password change options and other security settings will appear here.</p>
+            </div>
+
+            {/* Theme Settings Section */}
+            <div className="p-6 bg-card rounded-lg shadow">
+              <h3 className="text-xl font-medium mb-4">Theme Settings</h3>
+              <div className="space-y-2">
+                <Label>Appearance</Label>
+                <div className="flex items-center space-x-2">
+                  <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} size="sm" className="flex-1">
+                    <Sun className="mr-2 h-4 w-4" /> Light
+                  </Button>
+                  <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} size="sm" className="flex-1">
+                    <Moon className="mr-2 h-4 w-4" /> Dark
+                  </Button>
+                  <Button variant={theme === 'system' ? 'default' : 'outline'} onClick={() => setTheme('system')} size="sm" className="flex-1">
+                    <Laptop className="mr-2 h-4 w-4" /> System
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Current theme: {theme ? theme.charAt(0).toUpperCase() + theme.slice(1) : 'System'}
+                </p>
+              </div>
             </div>
 
           </div>
