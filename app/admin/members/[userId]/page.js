@@ -1,0 +1,149 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+// AdminRoute removed, handled by layout
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { ArrowLeft, User, Mail, Hash, Briefcase, CalendarDays, GraduationCap, Star, MapPin, Phone } from "lucide-react";
+import Link from "next/link";
+
+const UserDetailPageContent = () => {
+  const params = useParams();
+  const router = useRouter();
+  const userId = params.userId;
+
+  const [userDetail, setUserDetail] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUserDetail = async () => {
+      if (!userId) {
+        setError("User ID is missing.");
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        // @ts-ignore
+        const userDocRef = doc(db, "users", userId);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setUserDetail(docSnap.data());
+        } else {
+          setError("User not found.");
+        }
+      } catch (err) {
+        console.error("Error fetching user details:", err);
+        // @ts-ignore
+        setError(err.message || "Failed to fetch user details.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserDetail();
+  }, [userId]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-full"><p>Loading user details...</p></div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-center">
+        <p className="text-red-500 mb-4">Error: {error}</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
+      </div>
+    );
+  }
+
+  if (!userDetail) {
+    return (
+      <div className="text-center">
+        <p className="mb-4">No user details found.</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
+      </div>
+    );
+  }
+
+  // @ts-ignore
+  const { fullName, email, registerNumber, department, year, semester, dob, phone, address, interests, role } = userDetail;
+
+  return (
+    <div>
+      <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-6">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Members List
+      </Button>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="bg-muted/50 p-6">
+          <div className="flex items-start gap-4">
+            <div className="bg-primary text-primary-foreground rounded-full p-3 flex items-center justify-center">
+              <User className="h-8 w-8" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl">{fullName}</CardTitle>
+              {/* @ts-ignore */}
+              <CardDescription className="text-sm text-muted-foreground">{email} - Role: <span className="font-semibold capitalize">{role}</span></CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+            <div>
+              <h4 className="font-semibold mb-2 text-primary">Academic Information</h4>
+              <div className="space-y-1">
+                <p><GraduationCap className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Department:</strong> {department || 'N/A'}</p>
+                <p><CalendarDays className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Year:</strong> {year || 'N/A'}</p>
+                <p><CalendarDays className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Semester:</strong> {semester || 'N/A'}</p>
+                <p><Hash className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Register No:</strong> {registerNumber || 'N/A'}</p>
+              </div>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2 text-primary">Personal Details</h4>
+              <div className="space-y-1">
+                <p><CalendarDays className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Date of Birth:</strong> {dob || 'N/A'}</p>
+                <p><Phone className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Phone:</strong> {phone || 'N/A'}</p>
+                <p><MapPin className="inline mr-2 h-4 w-4 text-muted-foreground" /><strong>Address:</strong> {address || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-2 text-primary flex items-center"><Star className="inline mr-2 h-4 w-4 text-muted-foreground" />Interests</h4>
+            {interests && interests.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {/* @ts-ignore */}
+                {interests.map((interest) => (
+                  <span key={interest} className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-xs">
+                    {interest}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No interests specified.</p>
+            )}
+          </div>
+
+          {/* Placeholder for other sections like event participation, etc. */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// This is the main export for the page, wrapped in AdminRoute for protection.
+// It will be nested within app/admin/layout.js for the overall Admin Panel shell.
+const UserDetailsPage = () => {
+  return (
+    // AdminRoute wrapper removed, protection is handled by app/admin/layout.js
+    <UserDetailPageContent />
+  );
+};
+
+export default UserDetailsPage;
