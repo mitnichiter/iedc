@@ -193,7 +193,7 @@ const SettingsPageContent = () => {
                     <DialogHeader>
                       <DialogTitle>Edit Your Profile</DialogTitle>
                       <DialogDescription>
-                        Make changes to your profile here. Click save when you're done.
+                        Make changes to your profile here. Click save when you&apos;re done.
                         Email, Register Number, Department, Year and Semester cannot be changed here.
                       </DialogDescription>
                     </DialogHeader>
