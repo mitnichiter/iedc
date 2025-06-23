@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth"; // Added EmailAuthProvider, reauthenticateWithCredential, updatePassword
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,65 @@ const SettingsPageContent = () => {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const { theme, setTheme } = useTheme();
 
+  // States for Password Change
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordChangeMessage, setPasswordChangeMessage] = useState("");
+  const [passwordChangeError, setPasswordChangeError] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+
+  const handleChangePassword = async () => {
+    setPasswordChangeMessage("");
+    setPasswordChangeError("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordChangeError("All password fields are required.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 6) { // Basic length check, Firebase might have stricter rules
+        setPasswordChangeError("New password must be at least 6 characters long.");
+        return;
+    }
+
+    setIsChangingPassword(true);
+    const currentUser = auth.currentUser;
+
+    if (currentUser && currentUser.email) { // Ensure email is not null
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      try {
+        await reauthenticateWithCredential(currentUser, credential);
+        // User re-authenticated, now change password
+        await updatePassword(currentUser, newPassword);
+        setPasswordChangeMessage("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } catch (error) {
+        console.error("Password Change Error:", error);
+        // @ts-ignore
+        if (error.code === 'auth/wrong-password') {
+          setPasswordChangeError("Incorrect current password.");
+        // @ts-ignore
+        } else if (error.code === 'auth/too-many-requests') {
+          setPasswordChangeError("Too many attempts. Please try again later.");
+        } else {
+        // @ts-ignore
+          setPasswordChangeError(error.message || "Failed to change password. Please try again.");
+        }
+      } finally {
+        setIsChangingPassword(false);
+      }
+    } else {
+      setPasswordChangeError("User not found or email is missing. Please re-login."); // Should not happen if user is on settings page
+      setIsChangingPassword(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -264,10 +323,28 @@ const SettingsPageContent = () => {
               </div>
             </div>
 
-            {/* Placeholder for other settings sections */}
+            {/* Security Section - Password Change */}
             <div className="p-6 bg-card rounded-lg shadow">
               <h3 className="text-xl font-medium mb-4">Security</h3>
-              <p className="text-muted-foreground text-sm">Password change options and other security settings will appear here.</p>
+              <div className="space-y-4 max-w-md"> {/* Added max-w-md for better form appearance */}
+                <div>
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                </div>
+                <Button type="button" onClick={handleChangePassword} disabled={isChangingPassword}>
+                  {isChangingPassword ? "Changing..." : "Change Password"}
+                </Button>
+                {passwordChangeMessage && <p className="text-sm text-green-600">{passwordChangeMessage}</p>}
+                {passwordChangeError && <p className="text-sm text-red-600">{passwordChangeError}</p>}
+              </div>
             </div>
 
             {/* Theme Settings Section */}
