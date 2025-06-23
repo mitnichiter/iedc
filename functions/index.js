@@ -205,3 +205,113 @@ exports.verifyRegistrationEmailOtp = functions.https.onCall(async (data, context
     throw new functions.https.HttpsError("internal", "Failed to update OTP status.");
   }
 });
+
+// Function for an admin to set a user's role
+exports.setUserRole = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can set user roles."
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToUpdate, newRole } = data;
+  if (!userIdToUpdate || !newRole) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID and new role must be provided."
+    );
+  }
+
+  const validRoles = ["student", "admin"]; // Define valid roles
+  if (!validRoles.includes(newRole)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Invalid role specified."
+    );
+  }
+
+  try {
+    // 3. Set Custom Claim
+    // @ts-ignore
+    await admin.auth().setCustomUserClaims(userIdToUpdate, { role: newRole });
+
+    // 4. Update Firestore Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToUpdate);
+    await userDocRef.update({ role: newRole });
+
+    return { success: true, message: `User ${userIdToUpdate} role updated to ${newRole}.` };
+  } catch (error) {
+    console.error("Error setting user role:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to update was not found.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to set user role.");
+  }
+});
+
+// Function for an admin to delete a user's account
+exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can delete user accounts."
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToDelete } = data;
+  if (!userIdToDelete) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID to delete must be provided."
+    );
+  }
+
+  // Prevent admin from deleting themselves via this function as a safeguard
+  if (context.auth.uid === userIdToDelete) {
+    throw new functions.https.HttpsError(
+        "permission-denied",
+        "Admins cannot delete their own account through this function."
+    );
+  }
+
+  try {
+    // 3. Delete Firebase Auth User
+    // @ts-ignore
+    await admin.auth().deleteUser(userIdToDelete);
+
+    // 4. Delete Firestore User Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToDelete);
+    await userDocRef.delete();
+
+    // TODO: Consider deleting other user-associated data if necessary (e.g., from Storage, other collections)
+
+    return { success: true, message: `User ${userIdToDelete} and their data have been deleted.` };
+  } catch (error) {
+    console.error("Error deleting user account:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to delete was not found in Firebase Authentication.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to delete user account.");
+  }
+});
