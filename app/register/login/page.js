@@ -120,6 +120,9 @@ export default function LoginPage() {
       <div className="mt-4 text-center text-sm">
         Don&apos;t have an account?{' '}<Link href="/register" className="underline font-semibold">Register</Link>
       </div>
+      <div className="mt-2 text-center text-sm">
+        <Link href="/register/reset-password" पासclassName="underline font-semibold">Forgot password?</Link>
+      </div>
     </main>
   );
 }
