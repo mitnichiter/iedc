@@ -38,6 +38,7 @@ export default function RegisterPage() {
   const [department, setDepartment] = useState("");
   const [year, setYear] = useState("");
   const [semester, setSemester] = useState("");
+  const [registerNumber, setRegisterNumber] = useState(""); // <-- ADD THIS LINE
   
   // --- New states for interests ---
   const [selectedInterests, setSelectedInterests] = useState([]);
@@ -46,7 +47,7 @@ export default function RegisterPage() {
 
 
   const handleRegister = async () => {
-    if (!email || !password || !fullName || !department || !year || !semester) {
+    if (!email || !password || !fullName || !department || !year || !semester || !registerNumber) { // <-- MODIFIED LINE -->
         alert("Please fill out all required fields.");
         return;
     }
@@ -74,6 +75,7 @@ export default function RegisterPage() {
         department,
         year,
         semester,
+        registerNumber, // <-- ADD THIS LINE -->
         interests: finalInterests,
         role: 'student' // Assign a default role
       });
@@ -130,6 +132,10 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label htmlFor="dob">Date of Birth</Label>
                 <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+              </div>
+              <div className="space-y-2"> {/* <-- ADD THIS BLOCK --> */}
+                <Label htmlFor="registerNumber">Register Number</Label>
+                <Input id="registerNumber" placeholder="Enter Register Number" value={registerNumber} onChange={(e) => setRegisterNumber(e.target.value)} />
               </div>
             </div>
 
