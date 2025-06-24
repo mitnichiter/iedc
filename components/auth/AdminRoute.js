@@ -30,10 +30,12 @@ const AdminRoute = ({ children }) => {
       const userDocRef = doc(db, 'users', user.uid);
       const docSnap = await getDoc(userDocRef);
       
-      if (docSnap.exists() && docSnap.data().role === 'admin') {
+      // Check if the role is either 'admin' or 'superadmin'
+      const userRole = docSnap.exists() ? docSnap.data().role : null;
+      if (userRole === 'admin' || userRole === 'superadmin') {
         setIsAdmin(true);
       } else {
-        // Not an admin, redirect them to their user dashboard
+        // Not an admin or superadmin, redirect them to their user dashboard
         console.warn("Access Denied: User is not an admin.");
         router.push('/dashboard');
       }

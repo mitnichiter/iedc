@@ -216,10 +216,10 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
     );
   }
   // @ts-ignore
-  if (context.auth.token.role !== "admin") {
+  if (context.auth.token.role !== "superadmin") { // MODIFIED: Only superadmin can set roles
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only admins can set user roles."
+      "Only superadmins can set user roles." // MODIFIED: Error message
     );
   }
 
@@ -270,10 +270,10 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     );
   }
   // @ts-ignore
-  if (context.auth.token.role !== "admin") {
+  if (context.auth.token.role !== "superadmin") { // MODIFIED: Only superadmin can delete users
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only admins can delete user accounts."
+      "Only superadmins can delete user accounts." // MODIFIED: Error message
     );
   }
 
@@ -326,8 +326,14 @@ exports.grantAdminRole = functions.https.onCall(async (data, context) => {
       "The function must be called while authenticated."
     );
   }
-  // Optional: Further check if context.auth.uid is a known super-admin if this function is to be kept long-term.
-  // For initial setup, being authenticated might be enough if the page calling it is admin-protected.
+  // MODIFIED: Now, only a superadmin can call this function to grant 'admin' role to others.
+  // @ts-ignore
+  if (context.auth.token.role !== "superadmin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only superadmins can grant admin roles."
+    );
+  }
 
   const targetUid = data.uid;
   if (!targetUid) {

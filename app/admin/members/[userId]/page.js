@@ -217,29 +217,31 @@ const UserDetailPageContent = () => {
               </div>
             </div>
 
-            {/* Admin Actions Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="User Actions">
-                  <Settings2 className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { setRoleUpdateError(""); setRoleUpdateMessage(""); if(userDetail) {setSelectedRole(userDetail.role)}; setShowChangeRoleDialog(true); }}>
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Change Role
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50"
-                  onClick={() => { setDeleteUserError(""); setShowDeleteUserDialog(true); }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Member
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Admin Actions Dropdown - Only for Superadmins */}
+            {isSuperAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="User Actions">
+                    <Settings2 className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => { setRoleUpdateError(""); setRoleUpdateMessage(""); if(userDetail) {setSelectedRole(userDetail.role)}; setShowChangeRoleDialog(true); }}>
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Change Role
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50"
+                    onClick={() => { setDeleteUserError(""); setShowDeleteUserDialog(true); }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Member
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
