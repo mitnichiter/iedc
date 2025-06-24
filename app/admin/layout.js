@@ -11,8 +11,7 @@ import AdminRoute from "@/components/auth/AdminRoute";
 
 // This is the AdminLayout component, moved from app/admin/page.js
 const AdminPanelLayout = ({ children }) => {
-  // useAuth can be used here if needed for displaying user info in layout, but AdminRoute handles protection.
-  // const { user } = useAuth();
+  const { user } = useAuth(); // Get the authenticated user to check their role
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -59,13 +58,15 @@ const AdminPanelLayout = ({ children }) => {
                   Members
                 </Button>
               </Link>
-              {/* Temporary link for granting admin role - REMOVE/SECURE AFTER SETUP */}
-              <Link href="/admin/givesr" passHref>
-                <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Grant Admin (Setup)
-                </Button>
-              </Link>
+              {/* Conditional link for granting admin role - only for superadmins */}
+              {user && user.customClaims && user.customClaims.role === 'superadmin' && (
+                <Link href="/admin/givesr" passHref>
+                  <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Grant Admin (Setup)
+                  </Button>
+                </Link>
+              )}
             </nav>
           </aside>
 

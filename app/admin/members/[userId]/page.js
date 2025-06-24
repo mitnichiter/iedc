@@ -8,8 +8,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import {
-  ArrowLeft, User, Mail, Hash, Briefcase, CalendarDays, GraduationCap, Star, MapPin, Phone, Settings2, Trash2, UserCog
-} from "lucide-react"; // Added Settings2, Trash2, UserCog
+  ArrowLeft, User, Mail, Hash, Briefcase, CalendarDays, GraduationCap, Star, MapPin, Phone, Settings2, Trash2, UserCog, ClipboardCopy
+} from "lucide-react"; // Added ClipboardCopy
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,8 @@ import Link from "next/link";
 const UserDetailPageContent = () => {
   const params = useParams();
   const router = useRouter();
-  const userId = params.userId;
+  const userId = params.userId; // This is the ID of the user being viewed
+  const { user: loggedInAdmin } = useAuth(); // This is the currently logged-in admin
 
   const [userDetail, setUserDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,18 +49,34 @@ const UserDetailPageContent = () => {
   // State for Delete User Dialog
   const [showDeleteUserDialog, setShowDeleteUserDialog] = useState(false);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
-  const [deleteUserMessage, setDeleteUserMessage] = useState(""); // General messages, not for dialog
-  const [deleteUserError, setDeleteUserError] = useState("");   // General messages, not for dialog
+  const [deleteUserMessage, setDeleteUserMessage] = useState("");
+  const [deleteUserError, setDeleteUserError] = useState("");
 
+  const [copied, setCopied] = useState(false); // For copy UID button feedback
 
   const functions = getFunctions(app);
+
+  // Check if the logged-in admin is a superadmin
+  // @ts-ignore
+  const isSuperAdmin = loggedInAdmin && loggedInAdmin.customClaims && loggedInAdmin.customClaims.role === 'superadmin';
 
   useEffect(() => {
     if (userDetail) {
       // @ts-ignore
-      setSelectedRole(userDetail.role); // Initialize selectedRole when userDetail is loaded
+      setSelectedRole(userDetail.role);
     }
   }, [userDetail]);
+
+  const handleCopyUid = () => {
+    // @ts-ignore
+    navigator.clipboard.writeText(userId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    }).catch(err => {
+      console.error('Failed to copy UID: ', err);
+      // Optionally show an error message to the user
+    });
+  };
 
   const handleRoleChange = async () => {
     if (!selectedRole) {
@@ -188,6 +205,15 @@ const UserDetailPageContent = () => {
                 <CardTitle className="text-2xl">{fullName}</CardTitle>
                 {/* @ts-ignore */}
                 <CardDescription className="text-sm text-muted-foreground">{email} - Role: <span className="font-semibold capitalize">{role}</span></CardDescription>
+                {isSuperAdmin && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">UID: {userId}</span>
+                    <Button variant="ghost" size="sm" onClick={handleCopyUid} className="h-auto p-0.5 hover:bg-muted">
+                      <ClipboardCopy className="h-3 w-3" />
+                    </Button>
+                    {copied && <span className="text-xs text-green-500">Copied!</span>}
+                  </div>
+                )}
               </div>
             </div>
 
