@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext"; // Added this import
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 // AdminRoute removed, handled by layout
