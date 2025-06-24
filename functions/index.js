@@ -216,10 +216,10 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
     );
   }
   // @ts-ignore
-  if (context.auth.token.role !== "superadmin") { // MODIFIED: Only superadmin can set roles
+  if (context.auth.token.role !== "admin") { // REVERTED: Only admin can set roles
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only superadmins can set user roles." // MODIFIED: Error message
+      "Only admins can set user roles." // REVERTED: Error message
     );
   }
 
@@ -270,10 +270,10 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     );
   }
   // @ts-ignore
-  if (context.auth.token.role !== "superadmin") { // MODIFIED: Only superadmin can delete users
+  if (context.auth.token.role !== "admin") { // REVERTED: Only admin can delete users
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only superadmins can delete user accounts." // MODIFIED: Error message
+      "Only admins can delete user accounts." // REVERTED: Error message
     );
   }
 
@@ -326,12 +326,12 @@ exports.grantAdminRole = functions.https.onCall(async (data, context) => {
       "The function must be called while authenticated."
     );
   }
-  // MODIFIED: Now, only a superadmin can call this function to grant 'admin' role to others.
+  // REVERTED: Now, only an admin can call this function to grant 'admin' role to others.
   // @ts-ignore
-  if (context.auth.token.role !== "superadmin") {
+  if (context.auth.token.role !== "admin") {
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only superadmins can grant admin roles."
+      "Only admins can grant admin roles."
     );
   }
 

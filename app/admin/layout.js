@@ -58,15 +58,13 @@ const AdminPanelLayout = ({ children }) => {
                   Members
                 </Button>
               </Link>
-              {/* Conditional link for granting admin role - only for superadmins */}
-              {user && user.customClaims && user.customClaims.role === 'superadmin' && (
-                <Link href="/admin/givesr" passHref>
-                  <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
-                    <UserCog className="mr-2 h-4 w-4" />
-                    Grant Admin (Setup)
-                  </Button>
-                </Link>
-              )}
+              {/* Link for granting admin role - visible to all admins */}
+              <Link href="/admin/givesr" passHref>
+                <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Grant Admin (Setup)
+                </Button>
+              </Link>
             </nav>
           </aside>
 

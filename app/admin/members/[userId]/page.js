@@ -56,9 +56,8 @@ const UserDetailPageContent = () => {
 
   const functions = getFunctions(app);
 
-  // Check if the logged-in admin is a superadmin
-  // @ts-ignore
-  const isSuperAdmin = loggedInAdmin && loggedInAdmin.customClaims && loggedInAdmin.customClaims.role === 'superadmin';
+  // const isSuperAdmin check is no longer needed here for these UI elements
+  // const isSuperAdmin = loggedInAdmin && loggedInAdmin.customClaims && loggedInAdmin.customClaims.role === 'superadmin';
 
   useEffect(() => {
     if (userDetail) {
@@ -205,43 +204,40 @@ const UserDetailPageContent = () => {
                 <CardTitle className="text-2xl">{fullName}</CardTitle>
                 {/* @ts-ignore */}
                 <CardDescription className="text-sm text-muted-foreground">{email} - Role: <span className="font-semibold capitalize">{role}</span></CardDescription>
-                {isSuperAdmin && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">UID: {userId}</span>
-                    <Button variant="ghost" size="sm" onClick={handleCopyUid} className="h-auto p-0.5 hover:bg-muted">
-                      <ClipboardCopy className="h-3 w-3" />
-                    </Button>
-                    {copied && <span className="text-xs text-green-500">Copied!</span>}
-                  </div>
-                )}
+                {/* UID display and Copy button - now always visible for admins */}
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">UID: {userId}</span>
+                  <Button variant="ghost" size="sm" onClick={handleCopyUid} className="h-auto p-0.5 hover:bg-muted">
+                    <ClipboardCopy className="h-3 w-3" />
+                  </Button>
+                  {copied && <span className="text-xs text-green-500">Copied!</span>}
+                </div>
               </div>
             </div>
 
-            {/* Admin Actions Dropdown - Only for Superadmins */}
-            {isSuperAdmin && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="User Actions">
-                    <Settings2 className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => { setRoleUpdateError(""); setRoleUpdateMessage(""); if(userDetail) {setSelectedRole(userDetail.role)}; setShowChangeRoleDialog(true); }}>
-                    <UserCog className="mr-2 h-4 w-4" />
-                    Change Role
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50"
-                    onClick={() => { setDeleteUserError(""); setShowDeleteUserDialog(true); }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Member
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* Admin Actions Dropdown - now always visible for admins */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="User Actions">
+                  <Settings2 className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setRoleUpdateError(""); setRoleUpdateMessage(""); if(userDetail) {setSelectedRole(userDetail.role)}; setShowChangeRoleDialog(true); }}>
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Change Role
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-red-600 hover:!text-red-600 hover:!bg-red-50 focus:!text-red-600 focus:!bg-red-50"
+                  onClick={() => { setDeleteUserError(""); setShowDeleteUserDialog(true); }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Member
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
