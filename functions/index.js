@@ -315,3 +315,44 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", "Failed to delete user account.");
   }
 });
+
+// Function to grant admin role (set custom claim and update Firestore)
+exports.grantAdminRole = functions.https.onCall(async (data, context) => {
+  // It's good practice to ensure the caller is authenticated, even if this function is for setup.
+  // For a production setup, you might restrict this to a specific super admin UID or disable it after setup.
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // Optional: Further check if context.auth.uid is a known super-admin if this function is to be kept long-term.
+  // For initial setup, being authenticated might be enough if the page calling it is admin-protected.
+
+  const targetUid = data.uid;
+  if (!targetUid) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "UID of the target user must be provided."
+    );
+  }
+
+  try {
+    // Set custom claim for role: 'admin'
+    // @ts-ignore
+    await admin.auth().setCustomUserClaims(targetUid, { role: "admin" });
+
+    // Update the role in the user's Firestore document as well for consistency
+    const userDocRef = admin.firestore().collection("users").doc(targetUid);
+    await userDocRef.update({ role: "admin" }); // Using update assuming the doc exists. Use set with merge if unsure.
+
+    return { success: true, message: `Successfully granted admin role to user ${targetUid}.` };
+  } catch (error) {
+    console.error("Error granting admin role:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to grant admin role was not found in Firebase Authentication.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to grant admin role.");
+  }
+});

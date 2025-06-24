@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { LayoutDashboard, Users, LogOut, ChevronLeft } from "lucide-react";
+import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog } from "lucide-react"; // Added UserCog
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -59,7 +59,13 @@ const AdminPanelLayout = ({ children }) => {
                   Members
                 </Button>
               </Link>
-              {/* Add more admin links as needed */}
+              {/* Temporary link for granting admin role - REMOVE/SECURE AFTER SETUP */}
+              <Link href="/admin/givesr" passHref>
+                <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Grant Admin (Setup)
+                </Button>
+              </Link>
             </nav>
           </aside>
 
