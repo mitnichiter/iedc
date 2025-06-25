@@ -205,3 +205,63 @@ exports.verifyRegistrationEmailOtp = functions.https.onCall(async (data, context
     throw new functions.https.HttpsError("internal", "Failed to update OTP status.");
   }
 });
+
+// Helper function to check for admin role
+const ensureAdmin = async (context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+  }
+  const userDoc = await admin.firestore().collection("users").doc(context.auth.uid).get();
+  if (!userDoc.exists || userDoc.data().role !== "admin") {
+    throw new functions.https.HttpsError("permission-denied", "You must be an admin to perform this action.");
+  }
+};
+
+exports.approveUser = functions.https.onCall(async (data, context) => {
+  await ensureAdmin(context);
+
+  const { userId } = data;
+  if (!userId) {
+    throw new functions.https.HttpsError("invalid-argument", "UserId is required.");
+  }
+
+  try {
+    await admin.firestore().collection("users").doc(userId).update({ is_approved: true });
+    console.log(`User ${userId} approved by admin ${context.auth.uid}`);
+    return { success: true, message: "User approved successfully." };
+  } catch (error) {
+    console.error("Error approving user:", error);
+    throw new functions.https.HttpsError("internal", "Failed to approve user.");
+  }
+});
+
+exports.deleteUser = functions.https.onCall(async (data, context) => {
+  await ensureAdmin(context);
+
+  const { userId } = data;
+  if (!userId) {
+    throw new functions.https.HttpsError("invalid-argument", "UserId is required.");
+  }
+
+  try {
+    // Delete from Firestore
+    await admin.firestore().collection("users").doc(userId).delete();
+
+    // Delete from Firebase Authentication
+    await admin.auth().deleteUser(userId);
+
+    console.log(`User ${userId} deleted by admin ${context.auth.uid}`);
+    return { success: true, message: "User deleted successfully." };
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    // It's possible the user is already deleted from Auth or Firestore,
+    // so check error codes if more granular error handling is needed.
+    if (error.code === 'auth/user-not-found') {
+      console.warn(`User ${userId} not found in Firebase Auth during deletion, but attempting to proceed with Firestore deletion if not already done.`);
+      // If Firestore deletion failed before Auth, it might still be an issue.
+      // If Auth deletion failed because user not found, Firestore might still exist.
+      // The current structure attempts both; if Firestore fails, it throws. If Auth fails because not found, it's logged.
+    }
+    throw new functions.https.HttpsError("internal", `Failed to delete user. ${error.message}`);
+  }
+});

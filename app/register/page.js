@@ -75,10 +75,11 @@ export default function RegisterPage() {
         year,
         semester,
         interests: finalInterests,
-        role: 'student' // Assign a default role
+        role: 'student', // Assign a default role
+        is_approved: false // Add is_approved field
       });
 
-      alert('Registration successful! Welcome to IDEC.');
+      alert('Registration successful! Welcome to IDEC. Your account is pending admin approval.');
       // You can redirect the user here, e.g., window.location.href = '/dashboard';
 
     } catch (error) {
