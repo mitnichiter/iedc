@@ -30,11 +30,12 @@ export default function LoginPage() {
   const functions = getFunctions(app);
 
   useEffect(() => {
-    // If auth state is resolved, not loading, and user is logged in, redirect to dashboard
-    if (!authLoading && authUser) {
+    // Only redirect if auth is not loading, a user is authenticated globally,
+    // AND we are not in the middle of an active login attempt on this page.
+    if (!authLoading && authUser && loginStep === 'credentials' && !pendingUser) {
       router.push('/dashboard');
     }
-  }, [authUser, authLoading, router]);
+  }, [authUser, authLoading, router, loginStep, pendingUser]);
 
   const handleCredentialLogin = async () => {
     setIsLoading(true);
