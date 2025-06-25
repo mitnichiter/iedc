@@ -29,7 +29,12 @@ export default function LoginPage() {
 
   const functions = getFunctions(app);
 
-  // ✅ KEY CHANGE #1: The automatic redirect useEffect is GONE.
+  useEffect(() => {
+    // If auth state is resolved, not loading, and user is logged in, redirect to dashboard
+    if (!authLoading && authUser) {
+      router.push('/dashboard');
+    }
+  }, [authUser, authLoading, router]);
 
   const handleCredentialLogin = async () => {
     setIsLoading(true);
