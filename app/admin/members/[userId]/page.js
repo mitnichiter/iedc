@@ -204,7 +204,14 @@ const UserDetailPageContent = () => {
               <div>
                 <CardTitle className="text-2xl">{fullName}</CardTitle>
                 {/* @ts-ignore */}
-                <CardDescription className="text-sm text-muted-foreground">{email} - Role: <span className="font-semibold capitalize">{role}</span></CardDescription>
+                <CardDescription className="text-sm text-muted-foreground">
+                  {email} - Role: <span className="font-semibold capitalize">{role}</span>
+                  {/* @ts-ignore */}
+                  - Status: <span className={`font-semibold capitalize ${status === 'pending_approval' ? 'text-yellow-600' : status === 'approved' ? 'text-green-600' : 'text-gray-600'}`}>
+                    {/* @ts-ignore */}
+                    {status ? status.replace('_', ' ') : 'Unknown'}
+                  </span>
+                </CardDescription>
                 {/* UID display and Copy button - now always visible for admins */}
                 <div className="mt-1 flex items-center gap-1">
                   <span className="text-xs text-muted-foreground">UID: {userId}</span>

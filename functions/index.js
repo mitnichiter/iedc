@@ -362,3 +362,50 @@ exports.grantAdminRole = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", "Failed to grant admin role.");
   }
 });
+
+// Function for an admin to approve a user's pending registration
+exports.approveUser = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") { // Only admins can approve users
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can approve users."
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToApprove } = data;
+  if (!userIdToApprove) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID to approve must be provided."
+    );
+  }
+
+  try {
+    // 3. Update Firestore Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToApprove);
+    await userDocRef.update({
+      status: "approved",
+      approvedAt: admin.firestore.FieldValue.serverTimestamp() // Optional: record approval time
+    });
+
+    // TODO: Optionally send a welcome/approval email to the user here.
+
+    return { success: true, message: `User ${userIdToApprove} has been approved.` };
+  } catch (error) {
+    console.error("Error approving user:", error);
+    // @ts-ignore
+    if (error.code === "not-found") { // Firestore specific error code for .update() if doc doesn't exist
+        throw new functions.https.HttpsError("not-found", "The specified user to approve was not found in Firestore.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to approve user.");
+  }
+});
