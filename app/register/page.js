@@ -1,8 +1,9 @@
 
 "use client";
-import Link from 'next/link'; // <-- ADD THIS LINE
+import Link from 'next/link';
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase"; // Import auth and db from your firebase config
+import { auth, db, app } from "@/lib/firebase"; // Import app for functions
+import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase Functions tools
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -38,15 +39,85 @@ export default function RegisterPage() {
   const [department, setDepartment] = useState("");
   const [year, setYear] = useState("");
   const [semester, setSemester] = useState("");
+  const [registerNumber, setRegisterNumber] = useState(""); // <-- ADD THIS LINE
   
   // --- New states for interests ---
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [otherInterest, setOtherInterest] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [otp, setOtp] = useState(""); // <-- ADDED FOR OTP INPUT
+  const [otpSent, setOtpSent] = useState(false); // <-- ADDED TO TRACK OTP STATUS
+  const [otpVerified, setOtpVerified] = useState(false); // <-- ADDED TO TRACK OTP VERIFICATION
+  const [otpMessage, setOtpMessage] = useState(""); // <-- ADDED FOR OTP MESSAGES
+  const [otpError, setOtpError] = useState(""); // <-- ADDED FOR OTP ERRORS
 
+  const functions = getFunctions(app); // Initialize Firebase Functions
+
+  const handleSendOtp = async () => {
+    if (!email) {
+      setOtpError("Please enter your email address.");
+      return;
+    }
+    setIsLoading(true);
+    setOtpMessage("");
+    setOtpError("");
+    try {
+      const sendOtpFunction = httpsCallable(functions, 'sendRegistrationEmailOtp');
+      const result = await sendOtpFunction({ email });
+      // @ts-ignore
+      if (result.data.success) {
+      // @ts-ignore
+        setOtpMessage(result.data.message);
+        setOtpSent(true);
+      } else {
+      // @ts-ignore
+        setOtpError(result.data.message || "Failed to send OTP.");
+      }
+    } catch (error) {
+      console.error("Send OTP error:", error);
+      // @ts-ignore
+      setOtpError(error.message || "An error occurred while sending OTP.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp) {
+      setOtpError("Please enter the OTP.");
+      return;
+    }
+    setIsLoading(true);
+    setOtpMessage("");
+    setOtpError("");
+    try {
+      const verifyOtpFunction = httpsCallable(functions, 'verifyRegistrationEmailOtp');
+      const result = await verifyOtpFunction({ email, otp });
+      // @ts-ignore
+      if (result.data.success) {
+      // @ts-ignore
+        setOtpMessage(result.data.message);
+        setOtpVerified(true);
+        setOtpSent(false); // OTP is verified, can hide OTP input now
+      } else {
+      // @ts-ignore
+        setOtpError(result.data.message || "OTP verification failed.");
+      }
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      // @ts-ignore
+      setOtpError(error.message || "An error occurred during OTP verification.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRegister = async () => {
-    if (!email || !password || !fullName || !department || !year || !semester) {
+    if (!otpVerified) { // <-- ADDED OTP VERIFICATION CHECK
+        alert("Please verify your email address with OTP first.");
+        return;
+    }
+    if (!email || !password || !fullName || !department || !year || !semester || !registerNumber) {
         alert("Please fill out all required fields.");
         return;
     }
@@ -74,11 +145,13 @@ export default function RegisterPage() {
         department,
         year,
         semester,
+        registerNumber, // <-- ADD THIS LINE -->
         interests: finalInterests,
-        role: 'student' // Assign a default role
+        role: 'student', // Assign a default role
+        status: 'pending_approval' // Add initial status
       });
 
-      alert('Registration successful! Welcome to IDEC.');
+      alert('Registration successful! Your account is pending admin approval.'); // Modified alert
       // You can redirect the user here, e.g., window.location.href = '/dashboard';
 
     } catch (error) {
@@ -117,8 +190,31 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <div className="flex space-x-2">
+                  <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={otpSent || otpVerified} />
+                  {!otpSent && !otpVerified && (
+                    <Button type="button" onClick={handleSendOtp} disabled={isLoading || !email}>Send OTP</Button>
+                  )}
+                  {otpSent && !otpVerified && (
+                    <Button type="button" variant="outline" onClick={() => { setOtpSent(false); setOtp(""); setOtpMessage(""); setOtpError(""); setEmail(email); /* Keep email for resend if needed, or clear it: setEmail(""); */ }} disabled={isLoading}>Change Email</Button>
+                  )}
+                </div>
+                {otpMessage && <p className="text-sm text-green-600">{otpMessage}</p>}
+                {otpError && <p className="text-sm text-red-600">{otpError}</p>}
               </div>
+
+              {otpSent && !otpVerified && (
+                <div className="space-y-2">
+                  <Label htmlFor="otp">Enter OTP</Label>
+                  <div className="flex space-x-2">
+                    <Input id="otp" type="text" placeholder="123456" value={otp} onChange={(e) => setOtp(e.target.value)} />
+                    <Button type="button" onClick={handleVerifyOtp} disabled={isLoading || !otp}>Verify OTP</Button>
+                  </div>
+                </div>
+              )}
+
+              {otpVerified && <p className="text-sm font-medium text-green-600">Email Verified Successfully!</p>}
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -168,6 +264,10 @@ export default function RegisterPage() {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="registerNumber">Register Number</Label>
+                <Input id="registerNumber" placeholder="Enter Register Number" value={registerNumber} onChange={(e) => setRegisterNumber(e.target.value)} />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="interests">Interests</Label>
                 <MultiSelect
                   options={interestOptions}
@@ -176,23 +276,24 @@ export default function RegisterPage() {
                   className="w-full"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="other-interest">If Other, please specify</Label>
-                <Input
-                  id="other-interest"
-                  placeholder="e.g., AI/ML"
-                  value={otherInterest}
-                  onChange={(e) => setOtherInterest(e.target.value)}
-                  disabled={!isOtherInterestSelected}
-                  className={!isOtherInterestSelected ? "bg-gray-100 dark:bg-gray-800" : ""}
-                />
-              </div>
             </div>
 
+            {/* --- FULL WIDTH ROW FOR OTHER INTEREST --- */}
+            <div className="md:col-span-2 space-y-2"> {/* <-- MODIFIED LINE to span 2 columns on medium screens and up */}
+              <Label htmlFor="other-interest">If Other, please specify</Label>
+              <Input
+                id="other-interest"
+                placeholder="e.g., AI/ML"
+                value={otherInterest}
+                onChange={(e) => setOtherInterest(e.target.value)}
+                disabled={!isOtherInterestSelected}
+                className={!isOtherInterestSelected ? "bg-gray-100 dark:bg-gray-800" : ""}
+              />
+            </div>
           </form>
         </CardContent>
         <CardFooter>
-          <Button className="w-full bg-orange-700" onClick={handleRegister} disabled={isLoading}>
+          <Button className="w-full bg-orange-700" onClick={handleRegister} disabled={isLoading || !otpVerified}>
             {isLoading ? 'Registering...' : 'Register'}
           </Button>
         </CardFooter>
