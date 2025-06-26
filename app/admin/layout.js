@@ -12,6 +12,23 @@ import AdminRoute from "@/components/auth/AdminRoute";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Added Sheet components
 
 // This is the AdminLayout component, moved from app/admin/page.js
+// Define the links structure
+const adminNavItems = [
+  { href: "/admin", icon: LayoutDashboard, label: "Overview" },
+  { href: "/admin/members", icon: Users, label: "Members" },
+  { href: "/admin/givesr", icon: UserCog, label: "Grant Admin (Setup)", className: "text-orange-600 hover:text-orange-700" },
+];
+
+// Component for individual nav link
+const NavLinkButton = ({ href, icon: Icon, label, className }) => (
+  <Link href={href} passHref legacyBehavior>
+    <Button variant="ghost" className={`w-full justify-start ${className || ''}`}>
+      <Icon className="mr-2 h-4 w-4" />
+      {label}
+    </Button>
+  </Link>
+);
+
 const AdminPanelLayout = ({ children }) => {
   const { user } = useAuth(); // Get the authenticated user to check their role
   const router = useRouter();
@@ -25,35 +42,6 @@ const AdminPanelLayout = ({ children }) => {
       console.error("Admin logout failed:", error);
     }
   };
-
-  const navLinks = (
-    <>
-      <Link href="/admin" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start">
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Overview
-          </Button>
-        </SheetClose>
-      </Link>
-      <Link href="/admin/members" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start">
-            <Users className="mr-2 h-4 w-4" />
-            Members
-          </Button>
-        </SheetClose>
-      </Link>
-      <Link href="/admin/givesr" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
-            <UserCog className="mr-2 h-4 w-4" />
-            Grant Admin (Setup)
-          </Button>
-        </SheetClose>
-      </Link>
-    </>
-  );
 
   return (
     <AdminRoute> {/* Ensure the entire layout and its children are admin protected */}
@@ -71,7 +59,11 @@ const AdminPanelLayout = ({ children }) => {
                   </SheetTrigger>
                   <SheetContent side="left" className="w-64 p-4 pt-10">
                     <nav className="flex flex-col space-y-2">
-                      {navLinks}
+                      {adminNavItems.map((item) => (
+                        <SheetClose asChild key={item.href}>
+                          <NavLinkButton href={item.href} icon={item.icon} label={item.label} className={item.className} />
+                        </SheetClose>
+                      ))}
                     </nav>
                   </SheetContent>
                 </Sheet>
@@ -93,7 +85,9 @@ const AdminPanelLayout = ({ children }) => {
           {/* Side Navbar - hidden on mobile */}
           <aside className="hidden md:block w-64 bg-background p-4 border-r space-y-2 sticky top-16 h-[calc(100vh-4rem)]">
             <nav className="flex flex-col space-y-1">
-              {navLinks}
+              {adminNavItems.map((item) => (
+                <NavLinkButton key={item.href} href={item.href} icon={item.icon} label={item.label} className={item.className} />
+              ))}
             </nav>
           </aside>
 

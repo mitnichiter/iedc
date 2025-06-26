@@ -16,6 +16,23 @@ import { Shield, User, Library, Layers3, LogOut, LayoutGrid, ListChecks, Menu, S
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 // This is the actual content component for the dashboard
+// Define the links structure
+const dashboardNavItems = [
+  { href: "/dashboard", icon: LayoutGrid, label: "Overview" },
+  { href: "/dashboard/activities", icon: ListChecks, label: "My Activities" },
+  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+];
+
+// Component for individual nav link
+const NavLinkButton = ({ href, icon: Icon, label, className }) => (
+  <Link href={href} passHref legacyBehavior>
+    <Button variant="ghost" className={`w-full justify-start ${className || ''}`}>
+      <Icon className="mr-2 h-4 w-4" />
+      {label}
+    </Button>
+  </Link>
+);
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const router = useRouter();
@@ -53,36 +70,6 @@ const DashboardPage = () => {
     }
   };
 
-  const navLinks = (
-    <>
-      <Link href="/dashboard" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start">
-            <LayoutGrid className="mr-2 h-4 w-4" />
-            Overview
-          </Button>
-        </SheetClose>
-      </Link>
-      <Link href="/dashboard/activities" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start">
-            <ListChecks className="mr-2 h-4 w-4" />
-            My Activities
-          </Button>
-        </SheetClose>
-      </Link>
-      <Link href="/dashboard/settings" passHref>
-        <SheetClose asChild>
-          <Button variant="ghost" className="w-full justify-start">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
-        </SheetClose>
-      </Link>
-      {/* Add more links as needed */}
-    </>
-  );
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -114,7 +101,11 @@ const DashboardPage = () => {
                 </SheetTrigger>
                 <SheetContent side="left" className="w-60 p-4 pt-10">
                   <nav className="flex flex-col space-y-1">
-                    {navLinks}
+                    {dashboardNavItems.map((item) => (
+                      <SheetClose asChild key={item.href}>
+                        <NavLinkButton href={item.href} icon={item.icon} label={item.label} className={item.className} />
+                      </SheetClose>
+                    ))}
                   </nav>
                 </SheetContent>
               </Sheet>
@@ -146,7 +137,9 @@ const DashboardPage = () => {
         {/* Side Navbar - hidden on mobile */}
         <aside className="hidden md:block w-60 bg-background p-4 border-r space-y-2 sticky top-16 h-[calc(100vh-4rem)]">
           <nav className="flex flex-col space-y-1">
-            {navLinks}
+            {dashboardNavItems.map((item) => (
+              <NavLinkButton key={item.href} href={item.href} icon={item.icon} label={item.label} className={item.className} />
+            ))}
           </nav>
         </aside>
 
