@@ -204,6 +204,7 @@ exports.verifyRegistrationEmailOtp = functions.https.onCall(async (data, context
     console.error("Firestore update error (registrationOtps verification):", error);
     throw new functions.https.HttpsError("internal", "Failed to update OTP status.");
   }
+<<<<<<< feat/reset-password
 });
 
 // Function for an admin to set a user's role
@@ -408,4 +409,6 @@ exports.approveUser = functions.https.onCall(async (data, context) => {
     }
     throw new functions.https.HttpsError("internal", "Failed to approve user.");
   }
+=======
+>>>>>>> main
 });
