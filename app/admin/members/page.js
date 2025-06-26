@@ -153,7 +153,7 @@ const MembersListPageContent = () => {
       {users.length === 0 ? (
         <p>No members found.</p>
       ) : (
-        <div className="bg-card p-4 rounded-lg shadow">
+        <div className="bg-card p-4 rounded-lg shadow overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
