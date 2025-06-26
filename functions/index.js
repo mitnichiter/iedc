@@ -205,3 +205,207 @@ exports.verifyRegistrationEmailOtp = functions.https.onCall(async (data, context
     throw new functions.https.HttpsError("internal", "Failed to update OTP status.");
   }
 });
+
+// Function for an admin to set a user's role
+exports.setUserRole = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") { // REVERTED: Only admin can set roles
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can set user roles." // REVERTED: Error message
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToUpdate, newRole } = data;
+  if (!userIdToUpdate || !newRole) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID and new role must be provided."
+    );
+  }
+
+  const validRoles = ["student", "admin"]; // Define valid roles
+  if (!validRoles.includes(newRole)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Invalid role specified."
+    );
+  }
+
+  try {
+    // 3. Set Custom Claim
+    // @ts-ignore
+    await admin.auth().setCustomUserClaims(userIdToUpdate, { role: newRole });
+
+    // 4. Update Firestore Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToUpdate);
+    await userDocRef.update({ role: newRole });
+
+    return { success: true, message: `User ${userIdToUpdate} role updated to ${newRole}.` };
+  } catch (error) {
+    console.error("Error setting user role:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to update was not found.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to set user role.");
+  }
+});
+
+// Function for an admin to delete a user's account
+exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") { // REVERTED: Only admin can delete users
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can delete user accounts." // REVERTED: Error message
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToDelete } = data;
+  if (!userIdToDelete) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID to delete must be provided."
+    );
+  }
+
+  // Prevent admin from deleting themselves via this function as a safeguard
+  if (context.auth.uid === userIdToDelete) {
+    throw new functions.https.HttpsError(
+        "permission-denied",
+        "Admins cannot delete their own account through this function."
+    );
+  }
+
+  try {
+    // 3. Delete Firebase Auth User
+    // @ts-ignore
+    await admin.auth().deleteUser(userIdToDelete);
+
+    // 4. Delete Firestore User Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToDelete);
+    await userDocRef.delete();
+
+    // TODO: Consider deleting other user-associated data if necessary (e.g., from Storage, other collections)
+
+    return { success: true, message: `User ${userIdToDelete} and their data have been deleted.` };
+  } catch (error) {
+    console.error("Error deleting user account:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to delete was not found in Firebase Authentication.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to delete user account.");
+  }
+});
+
+// Function to grant admin role (set custom claim and update Firestore)
+exports.grantAdminRole = functions.https.onCall(async (data, context) => {
+  // It's good practice to ensure the caller is authenticated, even if this function is for setup.
+  // For a production setup, you might restrict this to a specific super admin UID or disable it after setup.
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // REVERTED: Now, only an admin can call this function to grant 'admin' role to others.
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can grant admin roles."
+    );
+  }
+
+  const targetUid = data.uid;
+  if (!targetUid) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "UID of the target user must be provided."
+    );
+  }
+
+  try {
+    // Set custom claim for role: 'admin'
+    // @ts-ignore
+    await admin.auth().setCustomUserClaims(targetUid, { role: "admin" });
+
+    // Update the role in the user's Firestore document as well for consistency
+    const userDocRef = admin.firestore().collection("users").doc(targetUid);
+    await userDocRef.update({ role: "admin" }); // Using update assuming the doc exists. Use set with merge if unsure.
+
+    return { success: true, message: `Successfully granted admin role to user ${targetUid}.` };
+  } catch (error) {
+    console.error("Error granting admin role:", error);
+    // @ts-ignore
+    if (error.code === "auth/user-not-found") {
+        throw new functions.https.HttpsError("not-found", "The specified user to grant admin role was not found in Firebase Authentication.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to grant admin role.");
+  }
+});
+
+// Function for an admin to approve a user's pending registration
+exports.approveUser = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  // @ts-ignore
+  if (context.auth.token.role !== "admin") { // Only admins can approve users
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Only admins can approve users."
+    );
+  }
+
+  // 2. Data Validation
+  const { userIdToApprove } = data;
+  if (!userIdToApprove) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "User ID to approve must be provided."
+    );
+  }
+
+  try {
+    // 3. Update Firestore Document
+    const userDocRef = admin.firestore().collection("users").doc(userIdToApprove);
+    await userDocRef.update({
+      status: "approved",
+      approvedAt: admin.firestore.FieldValue.serverTimestamp() // Optional: record approval time
+    });
+
+    // TODO: Optionally send a welcome/approval email to the user here.
+
+    return { success: true, message: `User ${userIdToApprove} has been approved.` };
+  } catch (error) {
+    console.error("Error approving user:", error);
+    // @ts-ignore
+    if (error.code === "not-found") { // Firestore specific error code for .update() if doc doesn't exist
+        throw new functions.https.HttpsError("not-found", "The specified user to approve was not found in Firestore.");
+    }
+    throw new functions.https.HttpsError("internal", "Failed to approve user.");
+  }
+});
