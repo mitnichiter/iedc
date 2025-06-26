@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog, Menu } from "lucide-react"; // Added Menu
+import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog, Menu, CalendarDays } from "lucide-react"; // Added Menu, CalendarDays
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/s
 const adminNavItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Overview" },
   { href: "/admin/members", icon: Users, label: "Members" },
+  { href: "/admin/events", icon: CalendarDays, label: "Events" },
   { href: "/admin/givesr", icon: UserCog, label: "Grant Admin (Setup)", className: "text-orange-600 hover:text-orange-700" },
 ];
 

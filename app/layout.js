@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/AuthContext"; // <-- 1. IMPORT IT
+import { Toaster } from "@/components/ui/sonner"; // Import Toaster
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
           {/* 2. WRAP YOUR APP WITH THE AUTH PROVIDER */}
           <AuthProvider>
             {children}
+            <Toaster richColors position="top-right" />
           </AuthProvider>
         </ThemeProvider>
       </body>
