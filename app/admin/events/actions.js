@@ -6,6 +6,8 @@ import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { nanoid } from "nanoid";
 
+import { isBefore, startOfDay, addDays } from 'date-fns'; // Import date-fns functions
+
 // Slugify function (simple version)
 function slugify(text) {
   return text
@@ -20,7 +22,13 @@ function slugify(text) {
 // Zod schema for event validation
 const eventSchema = z.object({
   eventName: z.string().min(3, "Event name must be at least 3 characters long."),
-  eventDate: z.string().refine((date) => !isNaN(new Date(date).getTime()), "Invalid date format."),
+  eventDate: z.string()
+    .refine((date) => !isNaN(new Date(date).getTime()), "Invalid date format.")
+    .refine((date) => {
+      const eventD = startOfDay(new Date(date));
+      const tomorrow = startOfDay(addDays(new Date(), 1));
+      return !isBefore(eventD, tomorrow);
+    }, "Event date must be at least 1 day in the future."),
   eventTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:MM)."),
   eventVenue: z.string().min(3, "Venue must be at least 3 characters long."),
   registrationFee: z.preprocess(
@@ -70,7 +78,12 @@ export async function createEvent(prevState, formData) {
 
   try {
     let bannerUrl = "";
-    if (bannerImage) {
+    if (bannerImage && bannerImage instanceof File) { // Ensure bannerImage is a File
+      console.log("Attempting to upload banner image. Details:");
+      console.log(" - Name:", bannerImage.name);
+      console.log(" - Size:", bannerImage.size);
+      console.log(" - Type:", bannerImage.type);
+
       const slugifiedEventName = slugify(eventName);
       const fileExtension = bannerImage.name.split(".").pop();
       const uniqueFileName = `${slugifiedEventName}_${Date.now()}.${fileExtension}`;
@@ -78,7 +91,14 @@ export async function createEvent(prevState, formData) {
 
       await uploadBytes(storageRef, bannerImage);
       bannerUrl = await getDownloadURL(storageRef);
+      console.log("Banner uploaded successfully. URL:", bannerUrl);
+    } else if (bannerImage) {
+      // This case might occur if something other than a File object is passed.
+      console.warn("bannerImage was present but not a File object. Type:", typeof bannerImage);
+      // Depending on strictness, you might want to return an error here.
+      // For now, we'll proceed without a banner if it's not a valid file.
     }
+
 
     const eventSlugBase = slugify(eventName);
     const uniqueEventSlug = `${eventSlugBase}-${nanoid(6)}`;
