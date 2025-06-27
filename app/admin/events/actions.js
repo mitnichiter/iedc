@@ -122,10 +122,13 @@ export async function createEvent(prevState, formData) {
       message: "Event created successfully!",
     };
   } catch (error) {
-    console.error("Error creating event:", error);
+    console.error("Detailed error creating event:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return {
       success: false,
-      message: error.message || "An unexpected error occurred while creating the event.",
+      // Attempt to get a more specific message if available
+      message: error.customData?.message || error.message || "An unexpected error occurred while creating the event. Check server logs for details.",
+      errorCode: error.code, // Send back the error code if present
+      errorDetails: JSON.stringify(error, Object.getOwnPropertyNames(error)), // For client-side debugging if needed
     };
   }
 }
