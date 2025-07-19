@@ -1,36 +1,46 @@
 // File: app/admin/page.js
 "use client";
 
-import AdminRoute from "@/components/auth/AdminRoute";
+// AdminRoute is now handled by app/admin/layout.js
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
+import Link from 'next/link';
+// Icons like LayoutDashboard, Users, LogOut, ChevronLeft are now in layout.js
+// useRouter, signOut, auth for logout are now in layout.js
 
-// This is the actual content of the admin page
-const AdminDashboard = () => {
-  const { user } = useAuth();
 
+// This is the content for the main admin dashboard page (/admin)
+const AdminDashboardContent = () => {
+  const { user } = useAuth(); // Still need useAuth for user-specific content like email
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold">Admin Control Center</h1>
-      <p className="mt-2 text-muted-foreground">Welcome, Admin {user?.email}!</p>
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Admin Overview</h1>
+      <p className="text-muted-foreground mb-6">Welcome, Admin {user?.email}!</p>
       
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold">User Management</h2>
-        <p className="text-sm text-muted-foreground">[User table will go here]</p>
-        <hr className="my-4" />
-        <h2 className="text-xl font-semibold">Event Management</h2>
-        <p className="text-sm text-muted-foreground">[Create new event form will go here]</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-6 bg-card rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-2">User Management</h2>
+          <p className="text-sm text-muted-foreground">View and manage IEDC members.</p>
+          <Link href="/admin/members" passHref>
+            <Button variant="outline" className="mt-4">Go to Members List</Button>
+          </Link>
+        </div>
+        <div className="p-6 bg-card rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-2">Event Management</h2>
+          <p className="text-sm text-muted-foreground">Create, edit, and manage events.</p>
+          {/* Placeholder for event management link/button */}
+          <Button variant="outline" className="mt-4" disabled>Manage Events (Coming Soon)</Button>
+        </div>
       </div>
     </div>
   );
 };
 
-// We wrap the content component with our new AdminRoute guard
+// The AdminPage now directly exports the content.
+// AdminRoute and AdminLayout are applied by app/admin/layout.js
 const AdminPage = () => {
   return (
-    <AdminRoute>
-      <AdminDashboard />
-    </AdminRoute>
+    <AdminDashboardContent />
   );
 };
 
