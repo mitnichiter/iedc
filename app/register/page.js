@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from "react";
 import { auth, db, app } from "@/lib/firebase"; // Import app for functions
 import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase Functions tools
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,7 +128,10 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Step 2: Prepare the final list of interests
+      // Step 2: Sign in the user
+      await signInWithEmailAndPassword(auth, email, password);
+
+      // Step 3: Prepare the final list of interests
       let finalInterests = selectedInterests.filter(interest => interest !== 'Other');
       if (selectedInterests.includes('Other') && otherInterest) {
         finalInterests.push(otherInterest);
