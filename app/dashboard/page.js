@@ -53,7 +53,8 @@ const DashboardPage = () => {
     }
   };
 
-  const navLinks = (
+  // Nav links for mobile (with SheetClose)
+  const mobileNavLinks = (
     <>
       <Link href="/dashboard" passHref>
         <SheetClose asChild>
@@ -78,6 +79,31 @@ const DashboardPage = () => {
             Settings
           </Button>
         </SheetClose>
+      </Link>
+      {/* Add more links as needed */}
+    </>
+  );
+
+  // Nav links for desktop (without SheetClose)
+  const desktopNavLinks = (
+    <>
+      <Link href="/dashboard" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <LayoutGrid className="mr-2 h-4 w-4" />
+          Overview
+        </Button>
+      </Link>
+      <Link href="/dashboard/activities" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <ListChecks className="mr-2 h-4 w-4" />
+          My Activities
+        </Button>
+      </Link>
+      <Link href="/dashboard/settings" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
+        </Button>
       </Link>
       {/* Add more links as needed */}
     </>
@@ -114,7 +140,7 @@ const DashboardPage = () => {
                 </SheetTrigger>
                 <SheetContent side="left" className="w-60 p-4 pt-10">
                   <nav className="flex flex-col space-y-1">
-                    {navLinks}
+                    {mobileNavLinks}
                   </nav>
                 </SheetContent>
               </Sheet>
@@ -146,7 +172,7 @@ const DashboardPage = () => {
         {/* Side Navbar - hidden on mobile */}
         <aside className="hidden md:block w-60 bg-background p-4 border-r space-y-2 sticky top-16 h-[calc(100vh-4rem)]">
           <nav className="flex flex-col space-y-1">
-            {navLinks}
+            {desktopNavLinks}
           </nav>
         </aside>
 
