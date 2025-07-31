@@ -26,7 +26,7 @@ const AdminPanelLayout = ({ children }) => {
     }
   };
 
-  const navLinks = (
+  const mobileNavLinks = (
     <>
       <Link href="/admin" passHref>
         <SheetClose asChild>
@@ -55,6 +55,29 @@ const AdminPanelLayout = ({ children }) => {
     </>
   );
 
+  const desktopNavLinks = (
+    <>
+      <Link href="/admin" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <LayoutDashboard className="mr-2 h-4 w-4" />
+          Overview
+        </Button>
+      </Link>
+      <Link href="/admin/members" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <Users className="mr-2 h-4 w-4" />
+          Members
+        </Button>
+      </Link>
+      <Link href="/admin/givesr" passHref>
+        <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
+          <UserCog className="mr-2 h-4 w-4" />
+          Grant Admin (Setup)
+        </Button>
+      </Link>
+    </>
+  );
+
   return (
     <AdminRoute> {/* Ensure the entire layout and its children are admin protected */}
       <div className="flex flex-col min-h-screen">
@@ -71,7 +94,7 @@ const AdminPanelLayout = ({ children }) => {
                   </SheetTrigger>
                   <SheetContent side="left" className="w-64 p-4 pt-10">
                     <nav className="flex flex-col space-y-2">
-                      {navLinks}
+                      {mobileNavLinks}
                     </nav>
                   </SheetContent>
                 </Sheet>
@@ -93,7 +116,7 @@ const AdminPanelLayout = ({ children }) => {
           {/* Side Navbar - hidden on mobile */}
           <aside className="hidden md:block w-64 bg-background p-4 border-r space-y-2 sticky top-16 h-[calc(100vh-4rem)]">
             <nav className="flex flex-col space-y-1">
-              {navLinks}
+              {desktopNavLinks}
             </nav>
           </aside>
 

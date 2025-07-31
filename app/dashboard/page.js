@@ -200,6 +200,24 @@ const DashboardPage = () => {
                   </CardContent>
                 </Card>
 
+                {userProfile && userProfile.role === "admin" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center text-primary">
+                        <Shield className="mr-2" /> Admin Panel
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground mb-4">
+                        Access the admin panel to manage users and events.
+                      </p>
+                      <Link href="/admin" passHref>
+                        <Button variant="outline">Go to Admin Panel</Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary">
