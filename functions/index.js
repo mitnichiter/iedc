@@ -237,6 +237,53 @@ exports.verifyRegistration = functions.https.onCall(async (data, context) => {
     }
 });
 
+exports.loginWithOtp = functions.https.onCall(async (data, context) => {
+    const { email, otp } = data;
+    if (!email || !otp) {
+        throw new functions.https.HttpsError("invalid-argument", "Email and OTP required.");
+    }
+
+    // Using the same 'registrationOtps' collection for this login flow for simplicity
+    // Note: The 'sendRegistrationEmailOtp' function sends OTPs to this collection.
+    const otpDocRef = admin.firestore().collection("registrationOtps").doc(email);
+    const otpDoc = await otpDocRef.get();
+
+    if (!otpDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "OTP not found or expired. Please request a new one.");
+    }
+
+    const { otp: storedOtp, expires } = otpDoc.data();
+
+    if (new Date() > expires.toDate()) {
+        await otpDocRef.delete();
+        throw new functions.https.HttpsError("deadline-exceeded", "OTP expired. Please request a new one.");
+    }
+
+    if (storedOtp !== otp) {
+        throw new functions.https.HttpsError("permission-denied", "Invalid OTP.");
+    }
+
+    try {
+        // Get user by email to create a custom token
+        const userRecord = await admin.auth().getUserByEmail(email);
+        const userId = userRecord.uid;
+
+        const customToken = await admin.auth().createCustomToken(userId);
+
+        // Delete the OTP document after successful use
+        await otpDocRef.delete();
+
+        return { token: customToken };
+
+    } catch (error) {
+        console.error("Error logging in with OTP:", error);
+        if (error.code === 'auth/user-not-found') {
+            throw new functions.https.HttpsError("not-found", "No user account exists for this email.");
+        }
+        throw new functions.https.HttpsError("internal", "Failed to log in.");
+    }
+});
+
 
 // RENAMED and UPDATED function to get registrations
 exports.getEventRegistrations = functions.https.onCall(async (data, context) => {
@@ -383,35 +430,6 @@ exports.sendEmailOtp = functions.https.onCall(async (data, context) => {
   }
 });
 
-
-exports.verifyEmailOtp = functions.https.onCall(async (data, context) => {
-    // ... (verify function can stay the same for now)
-    const { userId, otp } = data;
-    if (!userId || !otp) {
-        throw new functions.https.HttpsError("invalid-argument", "UserId and OTP required.");
-    }
-    
-    const otpDocRef = admin.firestore().collection("emailOtps").doc(userId);
-    const otpDoc = await otpDocRef.get();
-
-    if (!otpDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "OTP not found.");
-    }
-
-    const { otp: storedOtp, expires } = otpDoc.data();
-
-    if (new Date() > expires.toDate()) {
-        await otpDocRef.delete();
-        throw new functions.https.HttpsError("deadline-exceeded", "OTP expired.");
-    }
-
-    if (storedOtp !== otp) {
-        throw new functions.https.HttpsError("permission-denied", "Invalid OTP.");
-    }
-
-    await otpDocRef.delete();
-    return { success: true };
-});
 
 // Function to send OTP for new user registration (callable)
 exports.sendRegistrationEmailOtp = functions.https.onCall(async (data, context) => {
