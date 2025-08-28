@@ -171,41 +171,6 @@ exports.createUserWithPassword = functions.https.onCall(async (data, context) =>
     }
 });
 
-exports.createUserWithPassword = functions.https.onCall(async (data, context) => {
-    const { email, password, userData } = data;
-    if (!email || !password || !userData) {
-        throw new functions.https.HttpsError("invalid-argument", "Email, password, and user data are required.");
-    }
-
-    try {
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-
-        const userRecord = await admin.auth().createUser({
-            email: email,
-            password: password,
-        });
-
-        await admin.firestore().collection('users').doc(userRecord.uid).set({
-            ...userData,
-            uid: userRecord.uid,
-            passwordHash: passwordHash,
-            role: 'student',
-            status: 'approved',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        return { success: true, uid: userRecord.uid };
-
-    } catch (error) {
-        console.error("Error creating user:", error);
-        if (error.code === 'auth/email-already-exists') {
-            throw new functions.https.HttpsError("already-exists", "This email address is already in use by another account.");
-        }
-        throw new functions.https.HttpsError("internal", "Failed to create user.");
-    }
-});
-
 // Function to send OTP for existing user login
 exports.sendLoginOtp = functions.https.onCall(async (data, context) => {
   const { email } = data;
@@ -287,11 +252,12 @@ exports.loginWithPasswordAndOtp = functions.https.onCall(async (data, context) =
         return { token: customToken };
 
     } catch (error) {
-        console.error("Error logging in with password and OTP:", error);
+        console.error("Detailed error in loginWithPasswordAndOtp:", error);
         if (error.code === 'auth/user-not-found') {
             throw new functions.https.HttpsError("not-found", "No user account exists for this email.");
         }
-        throw new functions.https.HttpsError("internal", "Failed to log in.");
+        // Throwing the original error message for more specific client-side feedback
+        throw new functions.https.HttpsError("internal", error.message || "Failed to log in.");
     }
 });
 
