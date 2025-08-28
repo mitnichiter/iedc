@@ -22,6 +22,166 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ==================================================================
+// =================== EVENT MANAGEMENT FUNCTIONS ===================
+// ==================================================================
+
+// Function for an admin to create a new event
+exports.createEvent = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can create events.');
+  }
+
+  // 2. Data Validation
+  const { name, date, location, description, bannerUrl, audience, registrationFee } = data;
+  if (!name || !date || !location || !audience) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event name, date, location, and audience are required.');
+  }
+
+  // Date validation: must be at least 24 hours in the future
+  const eventDate = new Date(date);
+  const now = new Date();
+  const twentyFourHoursFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+
+  if (eventDate < twentyFourHoursFromNow) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event date must be at least 24 hours in the future.');
+  }
+
+  // 3. Create Event in Firestore
+  try {
+    const eventRef = await admin.firestore().collection('events').add({
+      name,
+      date: admin.firestore.Timestamp.fromDate(eventDate),
+      location,
+      description: description || '',
+      bannerUrl: bannerUrl || '',
+      audience, // e.g., "members", "all-students", "public"
+      registrationFee: registrationFee || 0,
+      createdBy: context.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      attendees: [],
+    });
+    return { success: true, eventId: eventRef.id };
+  } catch (error) {
+    console.error("Error creating event:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to create event.');
+  }
+});
+
+// Function for an admin to update an existing event
+exports.updateEvent = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can update events.');
+  }
+
+  // 2. Data Validation
+  const { eventId, ...eventData } = data;
+  if (!eventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
+  }
+
+  // If date is being updated, validate it
+  if (eventData.date) {
+    const eventDate = new Date(eventData.date);
+    const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    if (eventDate < twentyFourHoursFromNow) {
+        throw new functions.https.HttpsError('invalid-argument', 'Event date must be at least 24 hours in the future.');
+    }
+    // Convert date string to Firestore Timestamp
+    eventData.date = admin.firestore.Timestamp.fromDate(eventDate);
+  }
+
+
+  // 3. Update Event in Firestore
+  try {
+    await admin.firestore().collection('events').doc(eventId).update({
+        ...eventData,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating event:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to update event.');
+  }
+});
+
+// Function for an admin to delete an event
+exports.deleteEvent = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can delete events.');
+  }
+
+  // 2. Data Validation
+  const { eventId } = data;
+  if (!eventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
+  }
+
+  // 3. Delete Event from Firestore
+  try {
+    await admin.firestore().collection('events').doc(eventId).delete();
+    // Optional: Also remove this event from all users' registeredEvents list
+    // This is more complex and can be added later if needed.
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to delete event.');
+  }
+});
+
+// Function for a user to register for an event
+exports.registerForEvent = functions.https.onCall(async (data, context) => {
+    // 1. Authentication Check
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to register for events.');
+    }
+
+    // 2. Data Validation
+    const { eventId } = data;
+    if (!eventId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
+    }
+
+    const userId = context.auth.uid;
+    const eventRef = admin.firestore().collection('events').doc(eventId);
+    const userRef = admin.firestore().collection('users').doc(userId);
+
+    // 3. Add user to event attendees and event to user's registered events in a transaction
+    try {
+        await admin.firestore().runTransaction(async (transaction) => {
+            const eventDoc = await transaction.get(eventRef);
+            if (!eventDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Event not found.');
+            }
+
+            // Add user to event's attendees list (if not already there)
+            transaction.update(eventRef, {
+                attendees: admin.firestore.FieldValue.arrayUnion(userId)
+            });
+
+            // Add event to user's list of registered events (if not already there)
+            transaction.update(userRef, {
+                registeredEvents: admin.firestore.FieldValue.arrayUnion(eventId)
+            });
+        });
+
+        return { success: true, message: 'Successfully registered for the event.' };
+    } catch (error) {
+        console.error("Error registering for event:", error);
+        if (error.code) { // Check if it's a Firebase error
+            throw error; // Re-throw Firebase errors
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to register for the event.');
+    }
+});
+
 exports.sendEmailOtp = functions.https.onCall(async (data, context) => {
   // 1. Authentication Check
   if (!context.auth) {

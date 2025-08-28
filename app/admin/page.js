@@ -28,8 +28,9 @@ const AdminDashboardContent = () => {
         <div className="p-6 bg-card rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-2">Event Management</h2>
           <p className="text-sm text-muted-foreground">Create, edit, and manage events.</p>
-          {/* Placeholder for event management link/button */}
-          <Button variant="outline" className="mt-4" disabled>Manage Events (Coming Soon)</Button>
+          <Link href="/admin/events" passHref>
+            <Button variant="outline" className="mt-4">Manage Events</Button>
+          </Link>
         </div>
       </div>
     </div>
