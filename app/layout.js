@@ -1,11 +1,11 @@
 // File: app/layout.js
 
-import { Inter } from "next/font/google";
+import { League_Spartan } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/AuthContext"; // <-- 1. IMPORT IT
 
-const inter = Inter({ subsets: ["latin"] });
+const leagueSpartan = League_Spartan({ subsets: ["latin"] });
 
 export const metadata = {
   title: "IEDC Carmel",
@@ -15,7 +15,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={leagueSpartan.className}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
