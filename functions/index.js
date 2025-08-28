@@ -35,9 +35,9 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
   }
 
   // 2. Data Validation
-  const { name, date, location, description, bannerUrl, audience, registrationFee } = data;
-  if (!name || !date || !location || !audience) {
-    throw new functions.https.HttpsError('invalid-argument', 'Event name, date, location, and audience are required.');
+  const { name, date, venue, description, bannerUrl, audience, registrationFee } = data;
+  if (!name || !date || !venue || !audience) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event name, date, venue, and audience are required.');
   }
 
   // Date validation: must be at least 24 hours in the future
@@ -54,7 +54,7 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
     const eventRef = await admin.firestore().collection('events').add({
       name,
       date: admin.firestore.Timestamp.fromDate(eventDate),
-      location,
+      venue,
       description: description || '',
       bannerUrl: bannerUrl || '',
       audience, // e.g., "members", "all-students", "public"
