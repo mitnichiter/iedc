@@ -32,6 +32,7 @@ const interestOptions = [
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
   const [phone, setPhone] = useState("");
@@ -113,30 +114,27 @@ export default function RegisterPage() {
   };
 
   const handleRegister = async () => {
-    if (!otpVerified) { // <-- ADDED OTP VERIFICATION CHECK
-        alert("Please verify your email address with OTP first.");
-        return;
+    if (!otpVerified) {
+      alert("Please verify your email address with OTP first.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      alert("Passwords do not match.");
+      return;
     }
     if (!email || !password || !fullName || !department || !year || !semester || !registerNumber) {
-        alert("Please fill out all required fields.");
-        return;
+      alert("Please fill out all required fields.");
+      return;
     }
     setIsLoading(true);
 
     try {
-      // Step 1: Create user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Step 2: Prepare the final list of interests
-      let finalInterests = selectedInterests.filter(interest => interest !== 'Other');
+      const finalInterests = selectedInterests.filter(interest => interest !== 'Other');
       if (selectedInterests.includes('Other') && otherInterest) {
         finalInterests.push(otherInterest);
       }
 
-      // Step 3: Save all user info in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
+      const userData = {
         fullName,
         email,
         dob,
@@ -145,20 +143,19 @@ export default function RegisterPage() {
         department,
         year,
         semester,
-        registerNumber, // <-- ADD THIS LINE -->
+        registerNumber,
         interests: finalInterests,
-        role: 'student', // Assign a default role
-        status: 'pending_approval' // Add initial status
-      });
+      };
 
-      alert('Registration successful! Your account is pending admin approval.'); // Modified alert
-      // You can redirect the user here, e.g., window.location.href = '/dashboard';
+      const createUser = httpsCallable(functions, 'createUserWithPassword');
+      await createUser({ email, password, userData });
 
+      alert('Registration successful! Your account is pending admin approval.');
     } catch (error) {
       console.error("Error during registration:", error);
       alert(`Registration failed: ${error.message}`);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -218,6 +215,10 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>

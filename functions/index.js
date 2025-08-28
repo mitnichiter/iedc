@@ -2,6 +2,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const bcrypt = require('bcryptjs');
 
 admin.initializeApp();
 
@@ -133,6 +134,165 @@ exports.deleteEvent = functions.https.onCall(async (data, context) => {
     console.error("Error deleting event:", error);
     throw new functions.https.HttpsError('internal', 'Failed to delete event.');
   }
+});
+
+exports.createUserWithPassword = functions.https.onCall(async (data, context) => {
+    const { email, password, userData } = data;
+    if (!email || !password || !userData) {
+        throw new functions.https.HttpsError("invalid-argument", "Email, password, and user data are required.");
+    }
+
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        const userRecord = await admin.auth().createUser({
+            email: email,
+            password: password,
+        });
+
+        await admin.firestore().collection('users').doc(userRecord.uid).set({
+            ...userData,
+            uid: userRecord.uid,
+            passwordHash: passwordHash,
+            role: 'student',
+            status: 'approved',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { success: true, uid: userRecord.uid };
+
+    } catch (error) {
+        console.error("Error creating user:", error);
+        if (error.code === 'auth/email-already-exists') {
+            throw new functions.https.HttpsError("already-exists", "This email address is already in use by another account.");
+        }
+        throw new functions.https.HttpsError("internal", "Failed to create user.");
+    }
+});
+
+exports.createUserWithPassword = functions.https.onCall(async (data, context) => {
+    const { email, password, userData } = data;
+    if (!email || !password || !userData) {
+        throw new functions.https.HttpsError("invalid-argument", "Email, password, and user data are required.");
+    }
+
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        const userRecord = await admin.auth().createUser({
+            email: email,
+            password: password,
+        });
+
+        await admin.firestore().collection('users').doc(userRecord.uid).set({
+            ...userData,
+            uid: userRecord.uid,
+            passwordHash: passwordHash,
+            role: 'student',
+            status: 'approved',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { success: true, uid: userRecord.uid };
+
+    } catch (error) {
+        console.error("Error creating user:", error);
+        if (error.code === 'auth/email-already-exists') {
+            throw new functions.https.HttpsError("already-exists", "This email address is already in use by another account.");
+        }
+        throw new functions.https.HttpsError("internal", "Failed to create user.");
+    }
+});
+
+// Function to send OTP for existing user login
+exports.sendLoginOtp = functions.https.onCall(async (data, context) => {
+  const { email } = data;
+  if (!email) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email address must be provided.');
+  }
+
+  try {
+    // Check if user exists
+    await admin.auth().getUserByEmail(email);
+  } catch (error) {
+    if (error.code === 'auth/user-not-found') {
+      throw new functions.https.HttpsError('not-found', 'No user found with this email address.');
+    }
+    throw new functions.https.HttpsError('internal', 'Error checking user.');
+  }
+
+  // Re-use the existing OTP sending logic
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiration = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await admin.firestore().collection("loginOtps").doc(email).set({
+    otp,
+    expires: expiration,
+  });
+
+  const mailOptions = {
+    from: `IEDC Carmel <${gmailEmail}>`,
+    to: email,
+    subject: "Your IEDC Login OTP",
+    html: `<p>Your One-Time Password for login is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return { success: true };
+});
+
+
+// Function to login with password and OTP
+exports.loginWithPasswordAndOtp = functions.https.onCall(async (data, context) => {
+    const { email, password, otp } = data;
+    if (!email || !password || !otp) {
+        throw new functions.https.HttpsError("invalid-argument", "Email, password, and OTP are required.");
+    }
+
+    const otpDocRef = admin.firestore().collection("loginOtps").doc(email);
+    const otpDoc = await otpDocRef.get();
+
+    if (!otpDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "OTP not found or expired. Please request a new one.");
+    }
+
+    const { otp: storedOtp, expires } = otpDoc.data();
+
+    if (new Date() > expires.toDate()) {
+        await otpDocRef.delete();
+        throw new functions.https.HttpsError("deadline-exceeded", "OTP expired. Please request a new one.");
+    }
+
+    if (storedOtp !== otp) {
+        throw new functions.https.HttpsError("permission-denied", "Invalid OTP.");
+    }
+
+    try {
+        const userRecord = await admin.auth().getUserByEmail(email);
+        const userDoc = await admin.firestore().collection('users').doc(userRecord.uid).get();
+
+        if (!userDoc.exists || !userDoc.data().passwordHash) {
+            throw new functions.https.HttpsError("unauthenticated", "Password not set for this user.");
+        }
+
+        const passwordMatch = await bcrypt.compare(password, userDoc.data().passwordHash);
+        if (!passwordMatch) {
+            throw new functions.https.HttpsError("unauthenticated", "Incorrect password.");
+        }
+
+        const customToken = await admin.auth().createCustomToken(userRecord.uid);
+        await otpDocRef.delete();
+        return { token: customToken };
+
+    } catch (error) {
+        console.error("Error logging in with password and OTP:", error);
+        if (error.code === 'auth/user-not-found') {
+            throw new functions.https.HttpsError("not-found", "No user account exists for this email.");
+        }
+        throw new functions.https.HttpsError("internal", "Failed to log in.");
+    }
 });
 
 // NEW registerForEvent function

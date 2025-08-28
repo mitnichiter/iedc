@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,53 +26,52 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
-const emailSchema = z.object({
+const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
-});
-
-const otpSchema = z.object({
-  otp: z.string().min(6, { message: "OTP must be 6 digits." }),
+  password: z.string().min(1, { message: "Password is required." }),
+  otp: z.string().optional(),
 });
 
 export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
-  const [step, setStep] = useState('email'); // 'email', 'otp'
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [email, setEmail] = useState('');
+  const [step, setStep] = useState('credentials'); // 'credentials', 'otp'
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const emailForm = useForm({
-    resolver: zodResolver(emailSchema),
+  const form = useForm({
+    resolver: zodResolver(loginSchema),
   });
 
-  const otpForm = useForm({
-    resolver: zodResolver(otpSchema),
-  });
+  const handleSendOtp = async () => {
+    const email = form.getValues('email');
+    const password = form.getValues('password');
 
-  const handleSendOtp = async (values) => {
-    setIsSendingOtp(true);
+    if (!email || !password) {
+        form.trigger(['email', 'password']);
+        return;
+    }
+
+    setIsLoading(true);
     setError(null);
     try {
       const functions = getFunctions();
-      const sendOtp = httpsCallable(functions, 'sendRegistrationEmailOtp');
-      await sendOtp({ email: values.email });
-      setEmail(values.email);
+      const sendOtp = httpsCallable(functions, 'sendLoginOtp');
+      await sendOtp({ email });
       setStep('otp');
     } catch (err) {
       console.error("Error sending OTP:", err);
       setError(err.message);
     } finally {
-      setIsSendingOtp(false);
+      setIsLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (values) => {
-    setIsVerifying(true);
+  const handleLogin = async (values) => {
+    setIsLoading(true);
     setError(null);
     try {
       const functions = getFunctions();
-      const loginWithOtp = httpsCallable(functions, 'loginWithOtp');
-      const result = await loginWithOtp({ email, otp: values.otp });
+      const login = httpsCallable(functions, 'loginWithPasswordAndOtp');
+      const result = await login({ email: values.email, password: values.password, otp: values.otp });
 
       const token = result.data.token;
       await signInWithCustomToken(auth, token);
@@ -81,10 +79,10 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
       onLoginSuccess();
       onOpenChange(false); // Close the modal
     } catch (err) {
-      console.error("Error verifying OTP:", err);
+      console.error("Error logging in:", err);
       setError(err.message);
     } finally {
-      setIsVerifying(false);
+      setIsLoading(false);
     }
   };
 
@@ -94,22 +92,22 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
         <DialogHeader>
           <DialogTitle>Login to Continue</DialogTitle>
           <DialogDescription>
-            {step === 'email'
-              ? "Enter your email to receive a one-time password (OTP)."
-              : `Enter the OTP sent to ${email}`}
+            {step === 'credentials'
+              ? "Enter your email and password to login."
+              : `Enter the OTP sent to ${form.getValues('email')}`}
           </DialogDescription>
         </DialogHeader>
 
         {error && <p className="text-sm text-red-500 bg-red-50 p-3 rounded-md">{error}</p>}
 
-        {step === 'email' ? (
-          <Form {...emailForm}>
-            <form onSubmit={emailForm.handleSubmit(handleSendOtp)} className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
+            <div style={{ display: step === 'credentials' ? 'block' : 'none' }}>
               <FormField
-                control={emailForm.control}
+                control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="space-y-1">
                     <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="you@example.com" {...field} />
@@ -118,16 +116,24 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isSendingOtp} className="w-full">
-                {isSendingOtp ? 'Sending OTP...' : 'Send OTP'}
-              </Button>
-            </form>
-          </Form>
-        ) : (
-          <Form {...otpForm}>
-            <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-4">
               <FormField
-                control={otpForm.control}
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="space-y-1 mt-4">
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {step === 'otp' && (
+              <FormField
+                control={form.control}
                 name="otp"
                 render={({ field }) => (
                   <FormItem>
@@ -139,16 +145,23 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isVerifying} className="w-full">
-                {isVerifying ? 'Verifying...' : 'Login'}
+            )}
+
+            {step === 'credentials' ? (
+              <Button type="button" onClick={handleSendOtp} disabled={isLoading} className="w-full">
+                {isLoading ? 'Sending OTP...' : 'Send OTP'}
               </Button>
-            </form>
-          </Form>
-        )}
+            ) : (
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? 'Logging in...' : 'Login'}
+              </Button>
+            )}
+          </form>
+        </Form>
 
         {step === 'otp' && (
-            <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => { setStep('email'); setError(null); }}>
-                Use a different email
+            <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => { setStep('credentials'); setError(null); }}>
+                Back to login
             </Button>
         )}
       </DialogContent>

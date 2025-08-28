@@ -29,7 +29,7 @@ function EventCard({ event }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Link href={`/events/${event.id}/register`} passHref>
+        <Link href={`/events/${event.id}`} passHref>
           <Button className="w-full" variant="outline">View Event</Button>
         </Link>
       </CardContent>
