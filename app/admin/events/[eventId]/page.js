@@ -122,7 +122,7 @@ export default function EventDetailsPage() {
                 </div>
             </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card>
              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Target Audience</CardTitle>
                 <UsersIcon className="h-4 w-4 text-muted-foreground" />
