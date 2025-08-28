@@ -247,6 +247,50 @@ exports.getEvent = functions.https.onCall(async (data, context) => {
   }
 });
 
+// Function for an admin to get the list of attendees for an event
+exports.getEventAttendees = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can view event attendees.');
+  }
+
+  // 2. Data Validation
+  const { eventId } = data;
+  if (!eventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
+  }
+
+  // 3. Fetch event and attendees from Firestore
+  try {
+    const eventDoc = await admin.firestore().collection('events').doc(eventId).get();
+    if (!eventDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Event not found.');
+    }
+
+    const attendeesIds = eventDoc.data().attendees || [];
+    if (attendeesIds.length === 0) {
+      return [];
+    }
+
+    const userPromises = attendeesIds.map(userId => admin.firestore().collection('users').doc(userId).get());
+    const userDocs = await Promise.all(userPromises);
+
+    const attendees = userDocs
+      .filter(doc => doc.exists)
+      .map(doc => ({ id: doc.id, ...doc.data() }));
+
+    return attendees;
+
+  } catch (error) {
+    console.error("Error getting event attendees:", error);
+    if (error.code === 'not-found') {
+        throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to get event attendees.');
+  }
+});
+
 exports.sendEmailOtp = functions.https.onCall(async (data, context) => {
   // 1. Authentication Check
   if (!context.auth) {

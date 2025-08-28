@@ -8,8 +8,11 @@ import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon } from 'lucide-react';
+import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon, FileEdit } from 'lucide-react';
+import AttendeesList from './AttendeesList';
+import Link from 'next/link';
 
 export default function EventDetailsPage() {
   const params = useParams();
@@ -74,9 +77,17 @@ export default function EventDetailsPage() {
       )}
 
       {/* Event Header */}
-      <div className="space-y-2">
-        <h1 className="text-4xl font-extrabold tracking-tight">{event.name}</h1>
-        <p className="text-lg text-muted-foreground">{event.description}</p>
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-extrabold tracking-tight">{event.name}</h1>
+          <p className="text-lg text-muted-foreground">{event.description}</p>
+        </div>
+        <Link href={`/admin/events/${eventId}/edit`} passHref>
+          <Button variant="outline">
+            <FileEdit className="mr-2 h-4 w-4" />
+            Edit Event
+          </Button>
+        </Link>
       </div>
 
       {/* Event Details Grid */}
@@ -113,7 +124,7 @@ export default function EventDetailsPage() {
         </Card>
         <Card className="lg:col-span-3">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Audience</CardTitle>
+                <CardTitle className="text-sm font-medium">Target Audience</CardTitle>
                 <UsersIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -125,12 +136,23 @@ export default function EventDetailsPage() {
       <hr />
 
       {/* Tabs Section */}
-      <Tabs defaultValue="attendance" className="w-full">
+      <Tabs defaultValue="attendees" className="w-full">
         <TabsList>
+          <TabsTrigger value="attendees">Attendees</TabsTrigger>
           <TabsTrigger value="attendance">Attendance Report</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
         </TabsList>
+        <TabsContent value="attendees">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Registered Attendees</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <AttendeesList eventId={eventId} />
+                </CardContent>
+            </Card>
+        </TabsContent>
         <TabsContent value="attendance">
           <Card>
             <CardHeader>
