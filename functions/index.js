@@ -266,6 +266,71 @@ exports.getEventRegistrations = functions.https.onCall(async (data, context) => 
   }
 });
 
+// Function for an admin to get all events
+exports.getEvents = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can view the list of events.');
+  }
+
+  // 2. Fetch events from Firestore
+  try {
+    const eventsSnapshot = await admin.firestore().collection('events').orderBy('date', 'desc').get();
+    const events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Convert Timestamps to ISO strings
+    const sanitizedEvents = events.map(event => ({
+      ...event,
+      date: event.date.toDate().toISOString(),
+      createdAt: event.createdAt.toDate().toISOString(),
+      updatedAt: event.updatedAt ? event.updatedAt.toDate().toISOString() : null,
+    }));
+    return sanitizedEvents;
+  } catch (error) {
+    console.error("Error getting events:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to get events.');
+  }
+});
+
+// Function for an admin to get a single event
+exports.getEvent = functions.https.onCall(async (data, context) => {
+  // 1. Authentication and Admin Check
+  // @ts-ignore
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can view event details.');
+  }
+
+  // 2. Data Validation
+  const { eventId } = data;
+  if (!eventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
+  }
+
+  // 3. Fetch event from Firestore
+  try {
+    const eventDoc = await admin.firestore().collection('events').doc(eventId).get();
+    if (!eventDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Event not found.');
+    }
+    const eventData = eventDoc.data();
+    // Convert Timestamps to ISO strings
+    const sanitizedEvent = {
+      ...eventData,
+      id: eventDoc.id,
+      date: eventData.date.toDate().toISOString(),
+      createdAt: eventData.createdAt.toDate().toISOString(),
+      updatedAt: eventData.updatedAt ? eventData.updatedAt.toDate().toISOString() : null,
+    };
+    return sanitizedEvent;
+  } catch (error) {
+    console.error("Error getting event:", error);
+    if (error.code === 'not-found') {
+        throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to get event details.');
+  }
+});
+
 exports.sendEmailOtp = functions.https.onCall(async (data, context) => {
   // 1. Authentication Check
   if (!context.auth) {

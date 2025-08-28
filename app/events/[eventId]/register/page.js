@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
@@ -152,92 +153,105 @@ export default function RegistrationPage() {
 
   return (
     <div className="container mx-auto px-4 py-12 md:py-20">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl">Register for: {event?.name}</CardTitle>
-          <CardDescriptionComponent>
-            {event ? `on ${format(event.date.toDate(), 'PPP')} at ${event.venue}` : 'Loading event details...'}
-          </CardDescriptionComponent>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="userType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>I am a...</FormLabel>
-                    <Select onValueChange={(value) => {
-                      field.onChange(value);
-                      form.reset({
-                        ...form.getValues(),
-                        college: value === 'carmel-student' ? 'Carmel Polytechnic College, Alappuzha' : '',
-                      });
-                    }} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select your student type" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="carmel-student">Student of Carmel Polytechnic</SelectItem>
-                        <SelectItem value="other-college">Student from another college</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedUserType === 'carmel-student' && (
-                <FormField
-                  control={form.control}
-                  name="registerNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Register Number</FormLabel>
-                      <div className="flex w-full items-center space-x-2">
-                        <FormControl>
-                          <Input placeholder="Enter your college register number" {...field} />
-                        </FormControl>
-                        <Button type="button" onClick={handleFetchDetails} disabled={isFetchingDetails}>
-                          {isFetchingDetails ? 'Fetching...' : 'Fetch Details'}
-                        </Button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+        {event?.bannerUrl && (
+            <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden shadow-lg mb-8">
+                <Image
+                src={event.bannerUrl}
+                alt={`${event.name} banner`}
+                layout="fill"
+                objectFit="cover"
                 />
-              )}
+            </div>
+        )}
+        <div className="max-w-2xl mx-auto">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold">{event?.name}</h1>
+                <p className="text-muted-foreground mt-2">{event?.description}</p>
+            </div>
+            <Card>
+                <CardHeader>
+                <CardTitle className="text-2xl">Registration Form</CardTitle>
+                </CardHeader>
+                <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                        control={form.control}
+                        name="userType"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>I am a...</FormLabel>
+                            <Select onValueChange={(value) => {
+                            field.onChange(value);
+                            form.reset({
+                                ...form.getValues(),
+                                college: value === 'carmel-student' ? 'Carmel Polytechnic College, Alappuzha' : '',
+                            });
+                            }} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger><SelectValue placeholder="Select your student type" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="carmel-student">Student of Carmel Polytechnic</SelectItem>
+                                <SelectItem value="other-college">Student from another college</SelectItem>
+                            </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
 
-              <FormField control={form.control} name="fullName" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="college" render={({ field }) => (<FormItem><FormLabel>College Name</FormLabel><FormControl><Input {...field} disabled={selectedUserType === 'carmel-student'} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="department" render={({ field }) => (<FormItem><FormLabel>Department</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="semester" render={({ field }) => (<FormItem><FormLabel>Semester</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="mobileNumber" render={({ field }) => (<FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    {selectedUserType === 'carmel-student' && (
+                        <FormField
+                        control={form.control}
+                        name="registerNumber"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Register Number</FormLabel>
+                            <div className="flex w-full items-center space-x-2">
+                                <FormControl>
+                                <Input placeholder="Enter your college register number" {...field} />
+                                </FormControl>
+                                <Button type="button" onClick={handleFetchDetails} disabled={isFetchingDetails}>
+                                {isFetchingDetails ? 'Fetching...' : 'Fetch Details'}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    )}
 
-              <FormField
-                control={form.control}
-                name="paymentScreenshot"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Screenshot</FormLabel>
-                    <FormControl>
-                      <Input type="file" accept="image/*" onChange={(e) => field.onChange(e.target.files)} />
-                    </FormControl>
-                    <FormDescription>Upload a screenshot of your payment. Max 5MB.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <FormField control={form.control} name="fullName" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="college" render={({ field }) => (<FormItem><FormLabel>College Name</FormLabel><FormControl><Input {...field} disabled={selectedUserType === 'carmel-student'} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="department" render={({ field }) => (<FormItem><FormLabel>Department</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="semester" render={({ field }) => (<FormItem><FormLabel>Semester</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="mobileNumber" render={({ field }) => (<FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
 
-              <Button type="submit" disabled={isSubmitting} className="w-full">
-                {isSubmitting ? 'Submitting...' : 'Submit Registration'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                    <FormField
+                        control={form.control}
+                        name="paymentScreenshot"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Payment Screenshot</FormLabel>
+                            <FormControl>
+                            <Input type="file" accept="image/*" onChange={(e) => field.onChange(e.target.files)} />
+                            </FormControl>
+                            <FormDescription>Upload a screenshot of your payment. Max 5MB.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+
+                    <Button type="submit" disabled={isSubmitting} className="w-full">
+                        {isSubmitting ? 'Submitting...' : 'Submit Registration'}
+                    </Button>
+                    </form>
+                </Form>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
