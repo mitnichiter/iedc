@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon, FileEdit } from 'lucide-react';
-import AttendeesList from './AttendeesList';
+import RegistrationsList from './RegistrationsList';
 import Link from 'next/link';
 
 export default function EventDetailsPage() {
@@ -136,20 +136,20 @@ export default function EventDetailsPage() {
       <hr />
 
       {/* Tabs Section */}
-      <Tabs defaultValue="attendees" className="w-full">
+      <Tabs defaultValue="registrations" className="w-full">
         <TabsList>
-          <TabsTrigger value="attendees">Attendees</TabsTrigger>
+          <TabsTrigger value="registrations">Registrations</TabsTrigger>
           <TabsTrigger value="attendance">Attendance Report</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
         </TabsList>
-        <TabsContent value="attendees">
+        <TabsContent value="registrations">
             <Card>
                 <CardHeader>
-                    <CardTitle>Registered Attendees</CardTitle>
+                    <CardTitle>Event Registrations</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <AttendeesList eventId={eventId} />
+                    <RegistrationsList eventId={eventId} />
                 </CardContent>
             </Card>
         </TabsContent>

@@ -61,7 +61,6 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
       registrationFee: registrationFee || 0,
       createdBy: context.auth.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      attendees: [],
     });
     return { success: true, eventId: eventRef.id };
   } catch (error) {
@@ -136,158 +135,134 @@ exports.deleteEvent = functions.https.onCall(async (data, context) => {
   }
 });
 
-// Function for a user to register for an event
+// NEW registerForEvent function
 exports.registerForEvent = functions.https.onCall(async (data, context) => {
-    // 1. Authentication Check
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to register for events.');
-    }
+  // User must be authenticated to register, but we handle anon users too
+  const userId = context.auth ? context.auth.uid : 'anonymous_' + Date.now();
 
-    // 2. Data Validation
-    const { eventId } = data;
-    if (!eventId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
-    }
-
-    const userId = context.auth.uid;
-    const eventRef = admin.firestore().collection('events').doc(eventId);
-    const userRef = admin.firestore().collection('users').doc(userId);
-
-    // 3. Add user to event attendees and event to user's registered events in a transaction
-    try {
-        await admin.firestore().runTransaction(async (transaction) => {
-            const eventDoc = await transaction.get(eventRef);
-            if (!eventDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Event not found.');
-            }
-
-            // Add user to event's attendees list (if not already there)
-            transaction.update(eventRef, {
-                attendees: admin.firestore.FieldValue.arrayUnion(userId)
-            });
-
-            // Add event to user's list of registered events (if not already there)
-            transaction.update(userRef, {
-                registeredEvents: admin.firestore.FieldValue.arrayUnion(eventId)
-            });
-        });
-
-        return { success: true, message: 'Successfully registered for the event.' };
-    } catch (error) {
-        console.error("Error registering for event:", error);
-        if (error.code) { // Check if it's a Firebase error
-            throw error; // Re-throw Firebase errors
-        }
-        throw new functions.https.HttpsError('internal', 'Failed to register for the event.');
-    }
-});
-
-// Function for an admin to get all events
-exports.getEvents = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Admin Check
-  // @ts-ignore
-  if (context.auth.token.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can view the list of events.');
+  const { eventId, registrationData, screenshotUrl } = data;
+  if (!eventId || !registrationData || !screenshotUrl) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event ID, registration data, and screenshot are required.');
   }
 
-  // 2. Fetch events from Firestore
+  // Use email as a unique identifier for registrations if user is not logged in
+  const registrationId = context.auth ? userId : registrationData.email;
+  if(!registrationId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email is required for anonymous registration.');
+  }
+
+  const registrationRef = admin.firestore()
+    .collection('events').doc(eventId)
+    .collection('registrations').doc(registrationId);
+
   try {
-    const eventsSnapshot = await admin.firestore().collection('events').orderBy('date', 'desc').get();
-    const events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    // Convert Timestamps to ISO strings
-    const sanitizedEvents = events.map(event => ({
-      ...event,
-      date: event.date.toDate().toISOString(),
-      createdAt: event.createdAt.toDate().toISOString(),
-      updatedAt: event.updatedAt ? event.updatedAt.toDate().toISOString() : null,
-    }));
-    return sanitizedEvents;
+    await registrationRef.set({
+      ...registrationData,
+      userId: context.auth ? userId : null,
+      screenshotUrl: screenshotUrl,
+      status: 'pending', // Initial status
+      registeredAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true, message: 'Registration submitted successfully. Awaiting verification.' };
   } catch (error) {
-    console.error("Error getting events:", error);
-    throw new functions.https.HttpsError('internal', 'Failed to get events.');
+    console.error("Error submitting registration:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to submit registration.');
   }
 });
 
-// Function for an admin to get a single event
-exports.getEvent = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Admin Check
-  // @ts-ignore
-  if (context.auth.token.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can view event details.');
-  }
+// NEW function to send verification/rejection emails
+async function sendRegistrationStatusEmail(userEmail, userName, eventName, status) {
+    const subject = `Update on your registration for ${eventName}`;
+    let html;
 
-  // 2. Data Validation
-  const { eventId } = data;
-  if (!eventId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
-  }
-
-  // 3. Fetch event from Firestore
-  try {
-    const eventDoc = await admin.firestore().collection('events').doc(eventId).get();
-    if (!eventDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Event not found.');
+    if (status === 'verified') {
+        html = `<p>Hi ${userName},</p>
+                <p>Great news! Your registration for the event "<strong>${eventName}</strong>" has been verified and confirmed.</p>
+                <p>We look forward to seeing you there!</p>
+                <p>Thanks,<br/>The IEDC Carmel Team</p>`;
+    } else { // rejected
+        html = `<p>Hi ${userName},</p>
+                <p>There was an issue with your registration for the event "<strong>${eventName}</strong>".</p>
+                <p>Our team could not verify your payment screenshot. Please double-check the details and try again, or contact the event management team for assistance.</p>
+                <p>You can find contact information in the event brochure.</p>
+                <p>Thanks,<br/>The IEDC Carmel Team</p>`;
     }
-    const eventData = eventDoc.data();
-    // Convert Timestamps to ISO strings
-    const sanitizedEvent = {
-      ...eventData,
-      id: eventDoc.id,
-      date: eventData.date.toDate().toISOString(),
-      createdAt: eventData.createdAt.toDate().toISOString(),
-      updatedAt: eventData.updatedAt ? eventData.updatedAt.toDate().toISOString() : null,
+
+    const mailOptions = {
+        from: `IEDC Carmel <${gmailEmail}>`,
+        to: userEmail,
+        subject: subject,
+        html: html,
     };
-    return sanitizedEvent;
-  } catch (error) {
-    console.error("Error getting event:", error);
-    if (error.code === 'not-found') {
-        throw error;
+
+    await transporter.sendMail(mailOptions);
+}
+
+
+// NEW function for an admin to verify a registration
+exports.verifyRegistration = functions.https.onCall(async (data, context) => {
+    if (!context.auth || context.auth.token.role !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Only admins can verify registrations.');
     }
-    throw new functions.https.HttpsError('internal', 'Failed to get event details.');
-  }
+
+    const { eventId, registrationId, newStatus } = data;
+    if (!eventId || !registrationId || !newStatus || !['verified', 'rejected', 'pending'].includes(newStatus)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Event ID, Registration ID, and a valid status are required.');
+    }
+
+    const registrationRef = admin.firestore()
+        .collection('events').doc(eventId)
+        .collection('registrations').doc(registrationId);
+
+    try {
+        const registrationDoc = await registrationRef.get();
+        if (!registrationDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Registration not found.');
+        }
+
+        await registrationRef.update({ status: newStatus });
+
+        // Send email to the user, unless just moving back to pending
+        if (newStatus === 'verified' || newStatus === 'rejected') {
+            const userData = registrationDoc.data();
+            const eventDoc = await admin.firestore().collection('events').doc(eventId).get();
+            const eventName = eventDoc.exists ? eventDoc.data().name : 'the event';
+            await sendRegistrationStatusEmail(userData.email, userData.fullName, eventName, newStatus);
+        }
+
+        return { success: true, message: `Registration status updated to ${newStatus}.` };
+    } catch (error) {
+        console.error("Error verifying registration:", error);
+        throw new functions.https.HttpsError('internal', 'Failed to verify registration.');
+    }
 });
 
-// Function for an admin to get the list of attendees for an event
-exports.getEventAttendees = functions.https.onCall(async (data, context) => {
-  // 1. Authentication and Admin Check
-  // @ts-ignore
-  if (context.auth.token.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can view event attendees.');
+
+// RENAMED and UPDATED function to get registrations
+exports.getEventRegistrations = functions.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can view event registrations.');
   }
 
-  // 2. Data Validation
   const { eventId } = data;
   if (!eventId) {
     throw new functions.https.HttpsError('invalid-argument', 'Event ID is required.');
   }
 
-  // 3. Fetch event and attendees from Firestore
   try {
-    const eventDoc = await admin.firestore().collection('events').doc(eventId).get();
-    if (!eventDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Event not found.');
-    }
+    const registrationsSnapshot = await admin.firestore()
+        .collection('events').doc(eventId)
+        .collection('registrations').orderBy('registeredAt', 'desc').get();
 
-    const attendeesIds = eventDoc.data().attendees || [];
-    if (attendeesIds.length === 0) {
-      return [];
-    }
-
-    const userPromises = attendeesIds.map(userId => admin.firestore().collection('users').doc(userId).get());
-    const userDocs = await Promise.all(userPromises);
-
-    const attendees = userDocs
-      .filter(doc => doc.exists)
-      .map(doc => ({ id: doc.id, ...doc.data() }));
-
-    return attendees;
-
+    const registrations = registrationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        registeredAt: doc.data().registeredAt.toDate().toISOString(),
+    }));
+    return registrations;
   } catch (error) {
-    console.error("Error getting event attendees:", error);
-    if (error.code === 'not-found') {
-        throw error;
-    }
-    throw new functions.https.HttpsError('internal', 'Failed to get event attendees.');
+    console.error("Error getting event registrations:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to get registrations.');
   }
 });
 
