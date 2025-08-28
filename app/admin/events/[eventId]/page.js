@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon, FileEdit } from 'lucide-react';
+import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon, FileEdit, Share2 } from 'lucide-react';
 import RegistrationsList from './RegistrationsList';
 import Link from 'next/link';
 
@@ -21,6 +21,7 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -82,12 +83,26 @@ export default function EventDetailsPage() {
           <h1 className="text-4xl font-extrabold tracking-tight">{event.name}</h1>
           <p className="text-lg text-muted-foreground">{event.description}</p>
         </div>
-        <Link href={`/admin/events/${eventId}/edit`} passHref>
-          <Button variant="outline">
-            <FileEdit className="mr-2 h-4 w-4" />
-            Edit Event
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              const registrationUrl = `${window.location.origin}/events/${eventId}/register`;
+              navigator.clipboard.writeText(registrationUrl);
+              setIsCopied(true);
+              setTimeout(() => setIsCopied(false), 2000);
+            }}
+          >
+            <Share2 className="mr-2 h-4 w-4" />
+            {isCopied ? 'Copied!' : 'Share Link'}
           </Button>
-        </Link>
+          <Link href={`/admin/events/${eventId}/edit`} passHref>
+            <Button variant="outline">
+              <FileEdit className="mr-2 h-4 w-4" />
+              Edit Event
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Event Details Grid */}

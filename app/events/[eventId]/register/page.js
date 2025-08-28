@@ -9,6 +9,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from "@/components/ui/card";
 
 // Zod schema for the form
 const registrationFormSchema = z.object({
@@ -59,8 +60,11 @@ export default function RegistrationPage() {
   const router = useRouter();
   const params = useParams();
   const { eventId } = params;
+
+  const [event, setEvent] = useState(null);
+  const [isEventLoading, setIsEventLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userType, setUserType] = useState(null);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(registrationFormSchema),
@@ -69,13 +73,28 @@ export default function RegistrationPage() {
     },
   });
 
-  const handleRegisterNumberBlur = async (e) => {
-    const regNo = e.target.value;
-    if (!regNo) return;
+  useEffect(() => {
+    if (!eventId) return;
+    const fetchEvent = async () => {
+      setIsEventLoading(true);
+      const eventRef = doc(db, 'events', eventId);
+      const eventDoc = await getDoc(eventRef);
+      if (eventDoc.exists()) {
+        setEvent(eventDoc.data());
+      }
+      setIsEventLoading(false);
+    };
+    fetchEvent();
+  }, [eventId]);
+
+  const handleFetchDetails = async () => {
+    const regNo = form.getValues("registerNumber");
+    if (!regNo) {
+      form.setError("registerNumber", { type: "manual", message: "Please enter a register number first." });
+      return;
+    }
+    setIsFetchingDetails(true);
     try {
-      // This is a simplified logic. In a real app, you might have a cloud function
-      // to securely fetch user data by register number.
-      // For now, we assume a 'users' collection with registerNumber as doc ID.
       const userDoc = await getDoc(doc(db, "users", regNo));
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -87,9 +106,14 @@ export default function RegistrationPage() {
           semester: userData.semester,
           mobileNumber: userData.phone,
         });
+      } else {
+        form.setError("registerNumber", { type: "manual", message: "No student found with this register number." });
       }
     } catch (error) {
       console.error("Error fetching user data by register number:", error);
+      form.setError("registerNumber", { type: "manual", message: "Could not fetch details. Please try again." });
+    } finally {
+      setIsFetchingDetails(false);
     }
   };
 
@@ -109,7 +133,6 @@ export default function RegistrationPage() {
       const registerForEvent = httpsCallable(functions, 'registerForEvent');
       await registerForEvent({ eventId, registrationData, screenshotUrl });
 
-      // Redirect to a success page or show a success message
       alert("Registration successful! You will receive an email once your payment is verified.");
       router.push(`/events/${eventId}`);
 
@@ -123,11 +146,18 @@ export default function RegistrationPage() {
 
   const selectedUserType = form.watch("userType");
 
+  if (isEventLoading) {
+    return <div className="container h-screen flex justify-center items-center">Loading...</div>
+  }
+
   return (
     <div className="container mx-auto px-4 py-12 md:py-20">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Event Registration</CardTitle>
+          <CardTitle className="text-2xl">Register for: {event?.name}</CardTitle>
+          <CardDescriptionComponent>
+            {event ? `on ${format(event.date.toDate(), 'PPP')} at ${event.venue}` : 'Loading event details...'}
+          </CardDescriptionComponent>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -138,7 +168,13 @@ export default function RegistrationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>I am a...</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      form.reset({
+                        ...form.getValues(),
+                        college: value === 'carmel-student' ? 'Carmel Polytechnic College, Alappuzha' : '',
+                      });
+                    }} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select your student type" /></SelectTrigger>
                       </FormControl>
@@ -159,9 +195,14 @@ export default function RegistrationPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Register Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter your college register number" {...field} onBlur={handleRegisterNumberBlur} />
-                      </FormControl>
+                      <div className="flex w-full items-center space-x-2">
+                        <FormControl>
+                          <Input placeholder="Enter your college register number" {...field} />
+                        </FormControl>
+                        <Button type="button" onClick={handleFetchDetails} disabled={isFetchingDetails}>
+                          {isFetchingDetails ? 'Fetching...' : 'Fetch Details'}
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
