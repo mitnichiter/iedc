@@ -25,10 +25,27 @@ import {
 import Image from 'next/image';
 
 function VerificationModal({ registration, onVerify }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleAction = async (status) => {
+    setIsUpdating(true);
+    try {
+      await onVerify(registration.id, status);
+      // After successful verification, close the modal
+      setIsOpen(false);
+    } catch (error) {
+      // The parent's handleVerify function already shows an alert.
+      // We just need to ensure the loading state is turned off.
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">View & Verify</Button>
+        <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>View & Verify</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
@@ -53,10 +70,23 @@ function VerificationModal({ registration, onVerify }) {
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button type="button" variant="secondary">Close</Button>
+            <Button type="button" variant="secondary" disabled={isUpdating}>Close</Button>
           </DialogClose>
-          <Button type="button" variant="destructive" onClick={() => onVerify(registration.id, 'rejected')}>Reject</Button>
-          <Button type="button" onClick={() => onVerify(registration.id, 'verified')}>Approve</Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => handleAction('rejected')}
+            disabled={isUpdating}
+          >
+            {isUpdating ? 'Rejecting...' : 'Reject'}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => handleAction('verified')}
+            disabled={isUpdating}
+          >
+            {isUpdating ? 'Approving...' : 'Approve'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
