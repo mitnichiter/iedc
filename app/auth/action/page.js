@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { auth } from '@/lib/firebase';
-import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
+import { verifyPasswordResetCode, confirmPasswordReset, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ function PasswordResetComponent() {
   const [step, setStep] = useState('verifying'); // verifying, form, success, error
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
 
   const form = useForm({
     resolver: zodResolver(passwordResetSchema),
@@ -51,7 +53,8 @@ function PasswordResetComponent() {
 
     const verifyCode = async () => {
       try {
-        await verifyPasswordResetCode(auth, oobCode);
+        const userEmail = await verifyPasswordResetCode(auth, oobCode);
+        setEmail(userEmail);
         setStep('form');
       } catch (err) {
         console.error("Invalid password reset code:", err);
@@ -68,10 +71,20 @@ function PasswordResetComponent() {
     setError(null);
     try {
       await confirmPasswordReset(auth, oobCode, data.password);
+
+      // After successful reset, sign in the user to get an auth token
+      const userCredential = await signInWithEmailAndPassword(auth, email, data.password);
+      if (userCredential.user) {
+        // Now call the cloud function to set the password hash
+        const functions = getFunctions();
+        const setPassword = httpsCallable(functions, 'setPassword');
+        await setPassword({ password: data.password });
+      }
+
       setStep('success');
     } catch (err) {
       console.error("Error resetting password:", err);
-      setError("Failed to reset password. The link may have expired. Please try again.");
+      setError("Failed to reset password. The link may have expired or you may have entered an incorrect old password. Please try again.");
       setStep('error');
     } finally {
       setIsLoading(false);

@@ -136,38 +136,28 @@ exports.deleteEvent = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.createUserWithPassword = functions.https.onCall(async (data, context) => {
-    const { email, password, userData } = data;
-    if (!email || !password || !userData) {
-        throw new functions.https.HttpsError("invalid-argument", "Email, password, and user data are required.");
+exports.setPassword = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "You must be logged in to set a password.");
+    }
+
+    const { password } = data;
+    if (!password || password.length < 6) {
+        throw new functions.https.HttpsError("invalid-argument", "A password of at least 6 characters is required.");
     }
 
     try {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const userRecord = await admin.auth().createUser({
-            email: email,
-            password: password,
-        });
+        const userRef = admin.firestore().collection('users').doc(context.auth.uid);
+        await userRef.update({ passwordHash: passwordHash });
 
-        await admin.firestore().collection('users').doc(userRecord.uid).set({
-            ...userData,
-            uid: userRecord.uid,
-            passwordHash: passwordHash,
-            role: 'student',
-            status: 'approved',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        return { success: true, uid: userRecord.uid };
+        return { success: true, message: "Password updated successfully." };
 
     } catch (error) {
-        console.error("Error creating user:", error);
-        if (error.code === 'auth/email-already-exists') {
-            throw new functions.https.HttpsError("already-exists", "This email address is already in use by another account.");
-        }
-        throw new functions.https.HttpsError("internal", "Failed to create user.");
+        console.error("Error setting password:", error);
+        throw new functions.https.HttpsError("internal", "Failed to update password.");
     }
 });
 
@@ -238,13 +228,19 @@ exports.loginWithPasswordAndOtp = functions.https.onCall(async (data, context) =
         const userRecord = await admin.auth().getUserByEmail(email);
         const userDoc = await admin.firestore().collection('users').doc(userRecord.uid).get();
 
-        if (!userDoc.exists || !userDoc.data().passwordHash) {
-            throw new functions.https.HttpsError("unauthenticated", "Password not set for this user.");
-        }
-
-        const passwordMatch = await bcrypt.compare(password, userDoc.data().passwordHash);
-        if (!passwordMatch) {
-            throw new functions.https.HttpsError("unauthenticated", "Incorrect password.");
+        if (userDoc.exists && userDoc.data().passwordHash) {
+            // User exists and has a password hash, so we compare.
+            const passwordMatch = await bcrypt.compare(password, userDoc.data().passwordHash);
+            if (!passwordMatch) {
+                throw new functions.https.HttpsError("unauthenticated", "Incorrect password.");
+            }
+        } else {
+            // This is an old user without a password hash.
+            // We can't verify their password with bcrypt.
+            // This case should be handled by having them reset their password,
+            // which will then call setPassword to create the hash.
+            // For now, we will prevent login if hash doesn't exist.
+            throw new functions.https.HttpsError("unauthenticated", "Password not set for this user. Please use 'Forgot Password' to set it.");
         }
 
         const customToken = await admin.auth().createCustomToken(userRecord.uid);
