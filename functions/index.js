@@ -36,33 +36,52 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
   }
 
   // 2. Data Validation
-  const { name, date, venue, description, bannerUrl, audience, registrationFee } = data;
-  if (!name || !date || !venue || !audience) {
-    throw new functions.https.HttpsError('invalid-argument', 'Event name, date, venue, and audience are required.');
+  const {
+    name, date, time, venue, description, bannerUrl, audience, registrationFee,
+    endDate, endTime, bypassTimeConstraint, askForInstagram
+  } = data;
+
+  if (!name || !date || !time || !venue || !audience) {
+    throw new functions.https.HttpsError('invalid-argument', 'Event name, date, time, venue, and audience are required.');
   }
 
-  // Date validation: must be at least 24 hours in the future
   const eventDate = new Date(date);
-  const now = new Date();
-  const twentyFourHoursFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
 
-  if (eventDate < twentyFourHoursFromNow) {
-    throw new functions.https.HttpsError('invalid-argument', 'Event date must be at least 24 hours in the future.');
+  // Date validation (unless bypassed)
+  if (!bypassTimeConstraint) {
+    const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    if (eventDate < twentyFourHoursFromNow) {
+      throw new functions.https.HttpsError('invalid-argument', 'Event must be scheduled at least 24 hours in the future. Use the override toggle if you need to bypass this.');
+    }
   }
 
-  // 3. Create Event in Firestore
+  // 3. Prepare data for Firestore
+  const eventToCreate = {
+    name,
+    date: admin.firestore.Timestamp.fromDate(eventDate),
+    time,
+    venue,
+    description: description || '',
+    bannerUrl: bannerUrl || '',
+    audience,
+    registrationFee: registrationFee || 0,
+    askForInstagram: askForInstagram || false,
+    registrationCount: 0,
+    createdBy: context.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (endDate) {
+    eventToCreate.endDate = admin.firestore.Timestamp.fromDate(new Date(endDate));
+  }
+  if (endTime) {
+    eventToCreate.endTime = endTime;
+  }
+
+  // 4. Create Event in Firestore
   try {
-    const eventRef = await admin.firestore().collection('events').add({
-      name,
-      date: admin.firestore.Timestamp.fromDate(eventDate),
-      venue,
-      description: description || '',
-      bannerUrl: bannerUrl || '',
-      audience, // e.g., "members", "all-students", "public"
-      registrationFee: registrationFee || 0,
-      createdBy: context.auth.uid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const eventRef = await admin.firestore().collection('events').add(eventToCreate);
     return { success: true, eventId: eventRef.id };
   } catch (error) {
     console.error("Error creating event:", error);
@@ -94,6 +113,9 @@ exports.updateEvent = functions.https.onCall(async (data, context) => {
     }
     // Convert date string to Firestore Timestamp
     eventData.date = admin.firestore.Timestamp.fromDate(eventDate);
+  }
+  if (eventData.endDate) {
+    eventData.endDate = admin.firestore.Timestamp.fromDate(new Date(eventData.endDate));
   }
 
 
@@ -858,3 +880,41 @@ exports.approveUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", "Failed to approve user.");
   }
 });
+
+// ==================================================================
+// =================== BACKGROUND TRIGGERS ==========================
+// ==================================================================
+
+// Trigger to increment registration count when a new registration is created
+exports.incrementRegistrationCount = functions.firestore
+  .document('events/{eventId}/registrations/{registrationId}')
+  .onCreate(async (snap, context) => {
+    const eventId = context.params.eventId;
+    const eventRef = admin.firestore().collection('events').doc(eventId);
+
+    try {
+      await eventRef.update({
+        registrationCount: admin.firestore.FieldValue.increment(1)
+      });
+      console.log(`Successfully incremented registration count for event ${eventId}`);
+    } catch (error) {
+      console.error(`Failed to increment registration count for event ${eventId}`, error);
+    }
+  });
+
+// Trigger to decrement registration count when a registration is deleted
+exports.decrementRegistrationCount = functions.firestore
+  .document('events/{eventId}/registrations/{registrationId}')
+  .onDelete(async (snap, context) => {
+    const eventId = context.params.eventId;
+    const eventRef = admin.firestore().collection('events').doc(eventId);
+
+    try {
+      await eventRef.update({
+        registrationCount: admin.firestore.FieldValue.increment(-1)
+      });
+      console.log(`Successfully decremented registration count for event ${eventId}`);
+    } catch (error) {
+      console.error(`Failed to decrement registration count for event ${eventId}`, error);
+    }
+  });

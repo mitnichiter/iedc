@@ -125,7 +125,7 @@ export default function EventsPage() {
                         <TableCell className="font-medium">{event.name}</TableCell>
                         <TableCell>{format(new Date(event.date), "PPP")}</TableCell>
                         <TableCell>{event.venue}</TableCell>
-                        <TableCell>{event.registrations?.length || 0}</TableCell>
+                        <TableCell>{event.registrationCount || 0}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

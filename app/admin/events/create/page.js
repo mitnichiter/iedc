@@ -31,6 +31,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from 'lucide-react';
 import { format } from "date-fns";
@@ -42,13 +43,12 @@ const eventFormSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).optional(),
   date: z.date({
     required_error: "A date for the event is required.",
-  }).refine(date => {
-    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
-    const now = new Date();
-    const twentyFourHoursFromNow = new Date(now.getTime() + twentyFourHoursInMs);
-    return date > twentyFourHoursFromNow;
-  }, { message: "Event must be scheduled at least 24 hours in the future." }),
+  }),
+  bypassTimeConstraint: z.boolean().default(false).optional(),
+  askForInstagram: z.boolean().default(false).optional(),
   time: z.string().min(1, { message: "Time is required." }),
+  endDate: z.date().optional(),
+  endTime: z.string().optional(),
   venue: z.string().min(2, { message: "Venue is required." }),
   registrationFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }).default(0),
   audience: z.enum([
@@ -63,6 +63,33 @@ const eventFormSchema = z.object({
       (files) => ["image/jpeg", "image/png", "image/webp"].includes(files?.[0]?.type),
       "Only .jpg, .png, and .webp formats are supported."
     ),
+}).refine(data => {
+    if (data.endDate && data.date) {
+        return data.endDate >= data.date;
+    }
+    return true;
+}, {
+    message: "End date must be on or after the start date.",
+    path: ["endDate"],
+}).refine(data => {
+    if (data.date && data.endDate && data.date.getTime() === data.endDate.getTime() && data.endTime && data.time) {
+        return data.endTime > data.time;
+    }
+    return true;
+}, {
+    message: "End time must be after the start time on the same day.",
+    path: ["endTime"],
+}).refine(data => {
+    if (data.bypassTimeConstraint) {
+        return true;
+    }
+    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + twentyFourHoursInMs);
+    return data.date > twentyFourHoursFromNow;
+}, {
+    message: "Event must be scheduled at least 24 hours in the future.",
+    path: ["date"],
 });
 
 
@@ -184,7 +211,7 @@ export default function CreateEventPage() {
                 name="date"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Event Date</FormLabel>
+                    <FormLabel>Event Start Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -209,8 +236,10 @@ export default function CreateEventPage() {
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() + 1))}
-                          initialFocus
+                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate()))}
+                          captionLayout="dropdown-buttons"
+                          fromYear={new Date().getFullYear()}
+                          toYear={new Date().getFullYear() + 5}
                         />
                       </PopoverContent>
                     </Popover>
@@ -225,7 +254,67 @@ export default function CreateEventPage() {
                 name="time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Event Time</FormLabel>
+                    <FormLabel>Event Start Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Event End Date */}
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Event End Date (Optional)</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < form.getValues("date")}
+                          captionLayout="dropdown-buttons"
+                          fromYear={new Date().getFullYear()}
+                          toYear={new Date().getFullYear() + 5}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Event End Time */}
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event End Time (Optional)</FormLabel>
                     <FormControl>
                       <Input type="time" {...field} />
                     </FormControl>
@@ -290,6 +379,52 @@ export default function CreateEventPage() {
                 )}
                 />
             </div>
+
+            <FormField
+              control={form.control}
+              name="bypassTimeConstraint"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Bypass 24-hour Rule
+                    </FormLabel>
+                    <FormDescription>
+                      Allow creating an event that starts in less than 24 hours.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="askForInstagram"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Ask for Instagram Handle
+                    </FormLabel>
+                    <FormDescription>
+                      Add an optional field for attendees to enter their Instagram handle during registration.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Creating Event...' : 'Create Event'}
