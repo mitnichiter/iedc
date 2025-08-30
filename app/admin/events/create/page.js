@@ -210,7 +210,7 @@ export default function CreateEventPage() {
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem>
                     <FormLabel>Event Start Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -270,7 +270,7 @@ export default function CreateEventPage() {
                 control={form.control}
                 name="endDate"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem>
                     <FormLabel>Event End Date (Optional)</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
