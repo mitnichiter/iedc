@@ -27,33 +27,40 @@ const DashboardPage = () => {
 
   useEffect(
     () => {
-      const fetchUserProfile = async () => {
+      const fetchPageData = async () => {
+        setIsLoading(true);
+        let userRole = 'public';
+        let profile = null;
+
         if (user) {
           const userDocRef = doc(db, "users", user.uid);
           const docSnap = await getDoc(userDocRef);
-
           if (docSnap.exists()) {
-            setUserProfile(docSnap.data());
+            profile = docSnap.data();
+            setUserProfile(profile);
+            // Determine role from profile
+            if (profile.college === 'Carmel Polytechnic College, Alappuzha') {
+              userRole = 'carmel';
+            }
           } else {
             console.error("No profile document found for this user!");
           }
+        }
+
+        // Now fetch events with the determined role
+        try {
+          const functions = getFunctions();
+          const getPublicEvents = httpsCallable(functions, 'getPublicEvents');
+          const result = await getPublicEvents({ userRole });
+          setUpcomingEvents(result.data);
+        } catch (error) {
+          console.error("Error fetching upcoming events:", error);
+        } finally {
           setIsLoading(false);
         }
       };
 
-      fetchUserProfile();
-
-      const fetchUpcomingEvents = async () => {
-        try {
-          const functions = getFunctions();
-          const getPublicEvents = httpsCallable(functions, 'getPublicEvents');
-          const result = await getPublicEvents();
-          setUpcomingEvents(result.data);
-        } catch (error) {
-          console.error("Error fetching upcoming events:", error);
-        }
-      };
-      fetchUpcomingEvents();
+      fetchPageData();
     },
     [user]
   );

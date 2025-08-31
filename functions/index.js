@@ -95,12 +95,22 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
 
 // Function to get all upcoming events for public view
 exports.getPublicEvents = functions.https.onCall(async (data, context) => {
+  const { userRole } = data || {}; // Expects { userRole: 'carmel' } or empty
+
   try {
     const now = admin.firestore.Timestamp.now();
-    const eventsSnapshot = await admin.firestore().collection('events')
-      .where('date', '>=', now)
-      .orderBy('date', 'asc')
-      .get();
+    let eventsQuery = admin.firestore().collection('events')
+      .where('date', '>=', now);
+
+    if (userRole === 'carmel') {
+      // Carmel students see events for members, carmel students, and all students
+      eventsQuery = eventsQuery.where('audience', 'in', ['iedc-members', 'carmel-students', 'all-students']);
+    } else {
+      // Public users only see events for all students
+      eventsQuery = eventsQuery.where('audience', '==', 'all-students');
+    }
+
+    const eventsSnapshot = await eventsQuery.orderBy('date', 'asc').get();
 
     const events = eventsSnapshot.docs.map(doc => ({
         id: doc.id,
@@ -131,15 +141,17 @@ exports.updateEvent = functions.https.onCall(async (data, context) => {
   }
 
   // If date is being updated, validate it
-  if (eventData.date) {
+  if (eventData.date && !eventData.bypassTimeConstraint) {
     const eventDate = new Date(eventData.date);
     const now = new Date();
     const twentyFourHoursFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
     if (eventDate < twentyFourHoursFromNow) {
         throw new functions.https.HttpsError('invalid-argument', 'Event date must be at least 24 hours in the future.');
     }
-    // Convert date string to Firestore Timestamp
-    eventData.date = admin.firestore.Timestamp.fromDate(eventDate);
+  }
+  // Always convert date string to Firestore Timestamp if it exists
+  if (eventData.date) {
+    eventData.date = admin.firestore.Timestamp.fromDate(new Date(eventData.date));
   }
   if (eventData.endDate) {
     eventData.endDate = admin.firestore.Timestamp.fromDate(new Date(eventData.endDate));

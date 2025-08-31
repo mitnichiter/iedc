@@ -91,7 +91,10 @@ export default function EditEventPage() {
 
   const form = useForm({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: {},
+    defaultValues: {
+      bypassTimeConstraint: false,
+      askForInstagram: false,
+    },
   });
 
   useEffect(() => {
