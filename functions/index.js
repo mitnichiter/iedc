@@ -99,27 +99,50 @@ exports.getPublicEvents = functions.https.onCall(async (data, context) => {
 
   try {
     const now = admin.firestore.Timestamp.now();
-    let eventsQuery = admin.firestore().collection('events')
-      .where('date', '>=', now);
+    let allEvents = [];
 
     if (userRole === 'carmel') {
-      // Carmel students see events for members, carmel students, and all students
-      eventsQuery = eventsQuery.where('audience', 'in', ['iedc-members', 'carmel-students', 'all-students']);
+      const audiences = ['iedc-members', 'carmel-students', 'all-students'];
+      const queries = audiences.map(audience =>
+        admin.firestore().collection('events')
+          .where('date', '>=', now)
+          .where('audience', '==', audience)
+          .get()
+      );
+
+      const querySnapshots = await Promise.all(queries);
+      const eventMap = new Map();
+
+      querySnapshots.forEach(snapshot => {
+        snapshot.docs.forEach(doc => {
+          if (!eventMap.has(doc.id)) {
+            eventMap.set(doc.id, { id: doc.id, ...doc.data() });
+          }
+        });
+      });
+
+      allEvents = Array.from(eventMap.values());
+      // Sort by date client-side after merging
+      allEvents.sort((a, b) => a.date.toMillis() - b.date.toMillis());
+
     } else {
       // Public users only see events for all students
-      eventsQuery = eventsQuery.where('audience', '==', 'all-students');
+      const eventsSnapshot = await admin.firestore().collection('events')
+        .where('date', '>=', now)
+        .where('audience', '==', 'all-students')
+        .orderBy('date', 'asc')
+        .get();
+      allEvents = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    const eventsSnapshot = await eventsQuery.orderBy('date', 'asc').get();
-
-    const events = eventsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date.toDate().toISOString(),
-        endDate: doc.data().endDate ? doc.data().endDate.toDate().toISOString() : null,
-        createdAt: doc.data().createdAt.toDate().toISOString(),
+    const sanitizedEvents = allEvents.map(event => ({
+      ...event,
+      date: event.date.toDate().toISOString(),
+      endDate: event.endDate ? event.endDate.toDate().toISOString() : null,
+      createdAt: event.createdAt.toDate().toISOString(),
     }));
-    return events;
+
+    return sanitizedEvents;
   } catch (error) {
     console.error("Error getting public events:", error);
     throw new functions.https.HttpsError('internal', 'Failed to get public events.');
