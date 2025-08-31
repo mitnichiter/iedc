@@ -95,53 +95,23 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
 
 // Function to get all upcoming events for public view
 exports.getPublicEvents = functions.https.onCall(async (data, context) => {
-  const { userRole } = data || {};
-
   try {
     const now = admin.firestore.Timestamp.now();
-    let allEvents = [];
 
-    if (userRole === 'carmel') {
-      const audiences = ['iedc-members', 'carmel-students', 'all-students'];
-      const queries = audiences.map(audience =>
-        admin.firestore().collection('events')
-          .where('date', '>=', now)
-          .where('audience', '==', audience)
-          .orderBy('date', 'asc')
-          .get()
-      );
+    const eventsSnapshot = await admin.firestore().collection('events')
+      .where('date', '>=', now)
+      .orderBy('date', 'asc')
+      .get();
 
-      const querySnapshots = await Promise.all(queries);
-      const eventMap = new Map();
-
-      querySnapshots.forEach(snapshot => {
-        snapshot.docs.forEach(doc => {
-          if (!eventMap.has(doc.id)) {
-            eventMap.set(doc.id, { id: doc.id, ...doc.data() });
-          }
-        });
-      });
-
-      allEvents = Array.from(eventMap.values());
-      allEvents.sort((a, b) => a.date.toMillis() - b.date.toMillis());
-
-    } else {
-      const eventsSnapshot = await admin.firestore().collection('events')
-        .where('date', '>=', now)
-        .where('audience', '==', 'all-students')
-        .orderBy('date', 'asc')
-        .get();
-      allEvents = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    const sanitizedEvents = allEvents.map(event => ({
-      ...event,
-      date: event.date.toDate().toISOString(),
-      endDate: event.endDate ? event.endDate.toDate().toISOString() : null,
-      createdAt: event.createdAt.toDate().toISOString(),
+    const events = eventsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date.toDate().toISOString(),
+        endDate: doc.data().endDate ? doc.data().endDate.toDate().toISOString() : null,
+        createdAt: doc.data().createdAt.toDate().toISOString(),
     }));
 
-    return sanitizedEvents;
+    return events;
   } catch (error) {
     console.error("Critical error in getPublicEvents:", {
       message: error.message,
