@@ -95,7 +95,7 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
 
 // Function to get all upcoming events for public view
 exports.getPublicEvents = functions.https.onCall(async (data, context) => {
-  const { userRole } = data || {}; // Expects { userRole: 'carmel' } or empty
+  const { userRole } = data || {};
 
   try {
     const now = admin.firestore.Timestamp.now();
@@ -107,6 +107,7 @@ exports.getPublicEvents = functions.https.onCall(async (data, context) => {
         admin.firestore().collection('events')
           .where('date', '>=', now)
           .where('audience', '==', audience)
+          .orderBy('date', 'asc')
           .get()
       );
 
@@ -122,11 +123,9 @@ exports.getPublicEvents = functions.https.onCall(async (data, context) => {
       });
 
       allEvents = Array.from(eventMap.values());
-      // Sort by date client-side after merging
       allEvents.sort((a, b) => a.date.toMillis() - b.date.toMillis());
 
     } else {
-      // Public users only see events for all students
       const eventsSnapshot = await admin.firestore().collection('events')
         .where('date', '>=', now)
         .where('audience', '==', 'all-students')
@@ -144,8 +143,12 @@ exports.getPublicEvents = functions.https.onCall(async (data, context) => {
 
     return sanitizedEvents;
   } catch (error) {
-    console.error("Error getting public events:", error);
-    throw new functions.https.HttpsError('internal', 'Failed to get public events.');
+    console.error("Critical error in getPublicEvents:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+    throw new functions.https.HttpsError('internal', 'Failed to get public events. Please check the function logs for details.');
   }
 });
 
