@@ -29,25 +29,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-import { CalendarIcon } from 'lucide-react';
-import { format } from "date-fns";
 
 
 // 1. Define the validation schema with Zod
 const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters long." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).optional(),
-  date: z.date({
+  date: z.coerce.date({
     required_error: "A date for the event is required.",
   }),
   bypassTimeConstraint: z.boolean().default(false).optional(),
   askForInstagram: z.boolean().default(false).optional(),
   time: z.string().min(1, { message: "Time is required." }),
-  endDate: z.date().optional(),
+  endDate: z.coerce.date().optional(),
   endTime: z.string().optional(),
   venue: z.string().min(2, { message: "Venue is required." }),
   registrationFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }).default(0),
@@ -126,6 +121,9 @@ export default function CreateEventPage() {
         bannerUrl,
         date: values.date.toISOString(), // Convert date to string
       };
+      if (values.endDate) {
+        eventData.endDate = values.endDate.toISOString();
+      }
       delete eventData.banner; // Remove banner file from data object
 
       // 3. Call the 'createEvent' cloud function
@@ -210,39 +208,11 @@ export default function CreateEventPage() {
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem>
                     <FormLabel>Event Start Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate()))}
-                          captionLayout="dropdown-buttons"
-                          fromYear={new Date().getFullYear()}
-                          toYear={new Date().getFullYear() + 5}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -270,39 +240,11 @@ export default function CreateEventPage() {
                 control={form.control}
                 name="endDate"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem>
                     <FormLabel>Event End Date (Optional)</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < form.getValues("date")}
-                          captionLayout="dropdown-buttons"
-                          fromYear={new Date().getFullYear()}
-                          toYear={new Date().getFullYear() + 5}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
