@@ -21,7 +21,7 @@ const AdminRoute = ({ children }) => {
 
     // If auth is done and there's no user, redirect immediately
     if (!user) {
-      router.push('/register/login');
+      router.push('/login');
       return;
     }
 

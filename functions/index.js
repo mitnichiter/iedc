@@ -89,6 +89,33 @@ exports.createEvent = functions.https.onCall(async (data, context) => {
   }
 });
 
+// ==================================================================
+// =================== PUBLIC FUNCTIONS =============================
+// ==================================================================
+
+// Function to get all upcoming events for public view
+exports.getPublicEvents = functions.https.onCall(async (data, context) => {
+  try {
+    const now = admin.firestore.Timestamp.now();
+    const eventsSnapshot = await admin.firestore().collection('events')
+      .where('date', '>=', now)
+      .orderBy('date', 'asc')
+      .get();
+
+    const events = eventsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date.toDate().toISOString(),
+        endDate: doc.data().endDate ? doc.data().endDate.toDate().toISOString() : null,
+        createdAt: doc.data().createdAt.toDate().toISOString(),
+    }));
+    return events;
+  } catch (error) {
+    console.error("Error getting public events:", error);
+    throw new functions.https.HttpsError('internal', 'Failed to get public events.');
+  }
+});
+
 // Function for an admin to update an existing event
 exports.updateEvent = functions.https.onCall(async (data, context) => {
   // 1. Authentication and Admin Check

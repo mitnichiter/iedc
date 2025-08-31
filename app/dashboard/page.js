@@ -12,14 +12,16 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, User, Library, Layers3, LogOut, LayoutGrid, ListChecks, Menu, Settings } from "lucide-react"; // Added Menu, Settings
+import { Shield, User, Library, Layers3, LogOut, LayoutGrid, ListChecks, Menu, Settings, Calendar, ArrowRight } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // This is the actual content component for the dashboard
 const DashboardPage = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [userProfile, setUserProfile] = useState(null);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -40,6 +42,18 @@ const DashboardPage = () => {
       };
 
       fetchUserProfile();
+
+      const fetchUpcomingEvents = async () => {
+        try {
+          const functions = getFunctions();
+          const getPublicEvents = httpsCallable(functions, 'getPublicEvents');
+          const result = await getPublicEvents();
+          setUpcomingEvents(result.data);
+        } catch (error) {
+          console.error("Error fetching upcoming events:", error);
+        }
+      };
+      fetchUpcomingEvents();
     },
     [user]
   );
@@ -72,6 +86,14 @@ const DashboardPage = () => {
           </Button>
         </SheetClose>
       </Link>
+      <Link href="/events" passHref>
+        <SheetClose asChild>
+          <Button variant="ghost" className="w-full justify-start">
+            <Calendar className="mr-2 h-4 w-4" />
+            Events
+          </Button>
+        </SheetClose>
+      </Link>
       <Link href="/dashboard/settings" passHref>
         <SheetClose asChild>
           <Button variant="ghost" className="w-full justify-start">
@@ -97,6 +119,12 @@ const DashboardPage = () => {
         <Button variant="ghost" className="w-full justify-start">
           <ListChecks className="mr-2 h-4 w-4" />
           My Activities
+        </Button>
+      </Link>
+      <Link href="/events" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <Calendar className="mr-2 h-4 w-4" />
+          Events
         </Button>
       </Link>
       <Link href="/dashboard/settings" passHref>
@@ -256,6 +284,38 @@ const DashboardPage = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                <Card className="md:col-span-2 xl:col-span-1">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                        <Calendar className="mr-2" /> Upcoming Events
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {upcomingEvents.length > 0 ? (
+                        <ul className="space-y-4">
+                            {upcomingEvents.slice(0, 5).map(event => (
+                                <li key={event.id} className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-semibold">{event.name}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {new Date(event.date).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <Link href={`/events/${event.id}/register`} passHref>
+                                        <Button variant="ghost" size="sm">
+                                            Register <ArrowRight className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">No upcoming events right now. Check back soon!</p>
+                    )}
+                  </CardContent>
+                </Card>
+
               </div>
             </div>
           </div>

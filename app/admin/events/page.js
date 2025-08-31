@@ -15,7 +15,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Eye } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +50,9 @@ export default function EventsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
   const router = useRouter();
 
   const fetchEvents = async () => {
@@ -67,6 +77,24 @@ export default function EventsPage() {
   const handleDeleteClick = (event) => {
     setSelectedEvent(event);
     setShowDeleteDialog(true);
+  };
+
+  const handleViewParticipants = async (event) => {
+    setSelectedEvent(event);
+    setIsLoadingParticipants(true);
+    setShowParticipantsModal(true);
+    try {
+        const functions = getFunctions();
+        const getEventRegistrations = httpsCallable(functions, 'getEventRegistrations');
+        const result = await getEventRegistrations({ eventId: event.id });
+        const verifiedRegistrations = result.data.filter(reg => reg.status === 'verified');
+        setParticipants(verifiedRegistrations);
+    } catch (err) {
+        console.error("Error fetching participants:", err);
+        // TODO: show error in modal
+    } finally {
+        setIsLoadingParticipants(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -115,6 +143,7 @@ export default function EventsPage() {
                     <TableHead>Date</TableHead>
                     <TableHead>Venue</TableHead>
                     <TableHead>Registrations</TableHead>
+                    <TableHead>Participants</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -126,6 +155,12 @@ export default function EventsPage() {
                         <TableCell>{format(new Date(event.date), "PPP")}</TableCell>
                         <TableCell>{event.venue}</TableCell>
                         <TableCell>{event.registrationCount || 0}</TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm" onClick={() => handleViewParticipants(event)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </Button>
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -184,6 +219,42 @@ export default function EventsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
+        <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Verified Participants for {selectedEvent?.name}</DialogTitle>
+            </DialogHeader>
+            {isLoadingParticipants ? (
+                <p>Loading participants...</p>
+            ) : (
+                <div className="max-h-96 overflow-y-auto">
+                    {participants.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>College</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {participants.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell>{p.fullName}</TableCell>
+                                        <TableCell>{p.email}</TableCell>
+                                        <TableCell>{p.college}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <p>No verified participants yet.</p>
+                    )}
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

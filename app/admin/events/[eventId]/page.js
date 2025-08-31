@@ -11,6 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon, IndianRupeeIcon, FileEdit, Share2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import RegistrationsList from './RegistrationsList';
 import Link from 'next/link';
 
@@ -22,6 +29,7 @@ export default function EventDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -79,9 +87,20 @@ export default function EventDetailsPage() {
 
       {/* Event Header */}
       <div className="flex justify-between items-start">
-        <div className="space-y-2">
+        <div className="space-y-2 max-w-4xl">
           <h1 className="text-4xl font-extrabold tracking-tight">{event.name}</h1>
-          <p className="text-lg text-muted-foreground">{event.description}</p>
+          <p className="text-lg text-muted-foreground">
+            {event.description.length > 150 ? (
+              <>
+                {`${event.description.substring(0, 150)}... `}
+                <Button variant="link" className="p-0 h-auto" onClick={() => setIsDescriptionModalOpen(true)}>
+                  View More
+                </Button>
+              </>
+            ) : (
+              event.description
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -113,7 +132,7 @@ export default function EventDetailsPage() {
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{format(new Date(event.date), 'dd MMM yyyy')}</div>
+                <div className="text-2xl font-bold break-words">{format(new Date(event.date), 'dd MMM yyyy')}</div>
                 <p className="text-xs text-muted-foreground">{event.time}</p>
             </CardContent>
         </Card>
@@ -123,7 +142,7 @@ export default function EventDetailsPage() {
                 <MapPinIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{event.venue}</div>
+                <div className="text-2xl font-bold break-words">{event.venue}</div>
             </CardContent>
         </Card>
         <Card>
@@ -149,6 +168,18 @@ export default function EventDetailsPage() {
       </div>
 
       <hr />
+
+      {/* Description Modal */}
+      <Dialog open={isDescriptionModalOpen} onOpenChange={setIsDescriptionModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{event.name} - Full Description</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 prose max-w-none">
+            <p>{event.description}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabs Section */}
       <Tabs defaultValue="registrations" className="w-full">

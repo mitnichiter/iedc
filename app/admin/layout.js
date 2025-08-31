@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog, Menu } from "lucide-react"; // Added Menu
+import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog, Menu, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -44,6 +44,14 @@ const AdminPanelLayout = ({ children }) => {
           </Button>
         </SheetClose>
       </Link>
+      <Link href="/admin/events" passHref>
+        <SheetClose asChild>
+          <Button variant="ghost" className="w-full justify-start">
+            <CalendarDays className="mr-2 h-4 w-4" />
+            Events
+          </Button>
+        </SheetClose>
+      </Link>
       <Link href="/admin/givesr" passHref>
         <SheetClose asChild>
           <Button variant="ghost" className="w-full justify-start text-orange-600 hover:text-orange-700">
@@ -67,6 +75,12 @@ const AdminPanelLayout = ({ children }) => {
         <Button variant="ghost" className="w-full justify-start">
           <Users className="mr-2 h-4 w-4" />
           Members
+        </Button>
+      </Link>
+      <Link href="/admin/events" passHref>
+        <Button variant="ghost" className="w-full justify-start">
+          <CalendarDays className="mr-2 h-4 w-4" />
+          Events
         </Button>
       </Link>
       <Link href="/admin/givesr" passHref>

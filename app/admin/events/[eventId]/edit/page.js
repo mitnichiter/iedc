@@ -29,26 +29,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { CalendarIcon } from 'lucide-react';
-import { format } from "date-fns";
+import { Switch } from "@/components/ui/switch";
 
 
 // 1. Define the validation schema with Zod
 const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters long." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).optional(),
-  date: z.date({
+  date: z.coerce.date({
     required_error: "A date for the event is required.",
-  }).refine(date => {
-    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
-    const now = new Date();
-    const twentyFourHoursFromNow = new Date(now.getTime() + twentyFourHoursInMs);
-    return date > twentyFourHoursFromNow;
-  }, { message: "Event must be scheduled at least 24 hours in the future." }),
+  }),
+  bypassTimeConstraint: z.boolean().default(false).optional(),
+  askForInstagram: z.boolean().default(false).optional(),
   time: z.string().min(1, { message: "Time is required." }),
+  endDate: z.coerce.date().optional(),
+  endTime: z.string().optional(),
   venue: z.string().min(2, { message: "Venue is required." }),
   registrationFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }).default(0),
   audience: z.enum([
@@ -57,6 +52,33 @@ const eventFormSchema = z.object({
     "all-students",
   ], { required_error: "You must select a target audience." }),
   banner: z.any().optional(), // Banner is optional on edit
+}).refine(data => {
+    if (data.endDate && data.date) {
+        return data.endDate >= data.date;
+    }
+    return true;
+}, {
+    message: "End date must be on or after the start date.",
+    path: ["endDate"],
+}).refine(data => {
+    if (data.date && data.endDate && data.date.getTime() === data.endDate.getTime() && data.endTime && data.time) {
+        return data.endTime > data.time;
+    }
+    return true;
+}, {
+    message: "End time must be after the start time on the same day.",
+    path: ["endTime"],
+}).refine(data => {
+    if (data.bypassTimeConstraint) {
+        return true;
+    }
+    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + twentyFourHoursInMs);
+    return data.date > twentyFourHoursFromNow;
+}, {
+    message: "Event must be scheduled at least 24 hours in the future.",
+    path: ["date"],
 });
 
 
@@ -67,16 +89,9 @@ export default function EditEventPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [event, setEvent] = useState(null);
 
-  // 2. Define the form
   const form = useForm({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      time: "",
-      venue: "",
-      registrationFee: 0,
-    },
+    defaultValues: {},
   });
 
   useEffect(() => {
@@ -88,9 +103,21 @@ export default function EditEventPage() {
             const result = await getEvent({ eventId });
             const eventData = result.data;
             setEvent(eventData);
+
+            // Format dates for the native date input which expects YYYY-MM-DD
+            const formatDateForInput = (dateString) => {
+              if (!dateString) return '';
+              const date = new Date(dateString);
+              const year = date.getFullYear();
+              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+              const day = date.getDate().toString().padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+
             form.reset({
                 ...eventData,
-                date: new Date(eventData.date),
+                date: formatDateForInput(eventData.date),
+                endDate: eventData.endDate ? formatDateForInput(eventData.endDate) : '',
             });
         } catch (error) {
             console.error("Error fetching event for edit:", error);
@@ -99,14 +126,11 @@ export default function EditEventPage() {
     fetchEvent();
   }, [eventId, form]);
 
-
-  // 3. Define the submit handler
   async function onSubmit(values) {
     setIsSubmitting(true);
     try {
       let bannerUrl = event.bannerUrl;
       if (values.banner && values.banner.length > 0) {
-        // 1. Upload new banner image to Firebase Storage
         const bannerFile = values.banner[0];
         const storage = getStorage();
         const storageRef = ref(storage, `event-banners/${Date.now()}-${bannerFile.name}`);
@@ -114,27 +138,26 @@ export default function EditEventPage() {
         bannerUrl = await getDownloadURL(uploadResult.ref);
       }
 
-      // 2. Prepare data for the cloud function
       const eventData = {
         ...values,
         bannerUrl,
-        date: values.date.toISOString(), // Convert date to string
+        date: values.date.toISOString(),
         eventId,
       };
+      if (values.endDate) {
+        eventData.endDate = values.endDate.toISOString();
+      }
       delete eventData.banner;
 
-      // 3. Call the 'updateEvent' cloud function
       const functions = getFunctions();
       const updateEvent = httpsCallable(functions, 'updateEvent');
       await updateEvent(eventData);
 
-      // 4. Handle success
       console.log("Event updated successfully!");
       router.push(`/admin/events/${eventId}`);
 
     } catch (error) {
       console.error("Error updating event:", error);
-      // TODO: Show user-friendly error message
     } finally {
       setIsSubmitting(false);
     }
@@ -152,6 +175,7 @@ export default function EditEventPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            {/* ... form fields are identical to create page ... */}
             {/* Event Name */}
             <FormField
               control={form.control}
@@ -209,37 +233,11 @@ export default function EditEventPage() {
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Event Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() + 1))}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>Event Start Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -251,7 +249,39 @@ export default function EditEventPage() {
                 name="time"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Event Time</FormLabel>
+                    <FormLabel>Event Start Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Event End Date */}
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event End Date (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Event End Time */}
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event End Time (Optional)</FormLabel>
                     <FormControl>
                       <Input type="time" {...field} />
                     </FormControl>
@@ -316,6 +346,52 @@ export default function EditEventPage() {
                 )}
                 />
             </div>
+
+            <FormField
+              control={form.control}
+              name="bypassTimeConstraint"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Bypass 24-hour Rule
+                    </FormLabel>
+                    <FormDescription>
+                      Allow creating an event that starts in less than 24 hours.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="askForInstagram"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Ask for Instagram Handle
+                    </FormLabel>
+                    <FormDescription>
+                      Add an optional field for attendees to enter their Instagram handle during registration.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Updating Event...' : 'Update Event'}

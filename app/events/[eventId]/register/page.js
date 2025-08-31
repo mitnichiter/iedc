@@ -192,7 +192,9 @@ export default function RegistrationPage() {
                               <SelectContent>
                                   <SelectItem value="iedc-member">Member of IEDC Carmel</SelectItem>
                                   <SelectItem value="carmel-student">Student of Carmel (Non-Member)</SelectItem>
-                                  <SelectItem value="other-college">Student from another college</SelectItem>
+                                  {event?.audience === 'all-students' && (
+                                    <SelectItem value="other-college">Student from another college</SelectItem>
+                                  )}
                               </SelectContent>
                               </Select>
                               <FormMessage />
