@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from 'next/link';
-import { db, app } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import AdminRoute from "@/components/auth/AdminRoute";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -36,11 +35,6 @@ const MembersListPageContent = () => {
   const [userToDelete, setUserToDelete] = useState(null); // Stores { id: string, fullName: string }
   const [isDeleting, setIsDeleting] = useState(false); // For delete button loading state in dialog
 
-  const functions = getFunctions(app);
-  const approveUserFunction = httpsCallable(functions, 'approveUser');
-  const deleteUserAccountFunction = httpsCallable(functions, 'deleteUserAccount');
-
-
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
@@ -64,23 +58,26 @@ const MembersListPageContent = () => {
   }, []);
 
   const handleApproveUser = async (userIdToApprove) => {
+    if (!auth.currentUser) return;
     setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: true, message: '', error: '' } }));
     try {
-      // @ts-ignore
-      const result = await approveUserFunction({ userIdToApprove });
-      setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: result.data.message, error: '' } }));
-      // Update user status locally for immediate UI update
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/members/${userIdToApprove}/approve`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to approve user.");
+
+      setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: result.message, error: '' } }));
       setUsers(prevUsers => prevUsers.map(u =>
-        // @ts-ignore
         u.id === userIdToApprove ? { ...u, status: 'approved' } : u
       ));
-      // Optionally clear message after a few seconds
       setTimeout(() => {
         setActionStates(prev => ({ ...prev, [userIdToApprove]: { ...prev[userIdToApprove], message: '' } }));
       }, 3000);
     } catch (err) {
       console.error("Error approving user (client):", err);
-      // @ts-ignore
       setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: '', error: err.message || "Failed to approve." } }));
     }
   };
@@ -94,40 +91,39 @@ const MembersListPageContent = () => {
   };
 
   const handleDeleteUserConfirm = async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || !auth.currentUser) return;
 
-    // @ts-ignore
     const { id: userIdToDelete } = userToDelete;
     setIsDeleting(true);
     setActionStates(prev => ({ ...prev, [userIdToDelete]: { isLoading: true, message: '', error: '' } }));
 
-
     try {
-      // @ts-ignore
-      await deleteUserAccountFunction({ userIdToDelete });
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/members/${userIdToDelete}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete user.");
+      }
+
       setActionStates(prev => ({
         ...prev,
         [userIdToDelete]: { isLoading: false, message: "User deleted successfully.", error: '' }
       }));
-      setUsers(prevUsers => prevUsers.filter(u => u.id !== userIdToDelete)); // Remove user from local list
+      setUsers(prevUsers => prevUsers.filter(u => u.id !== userIdToDelete));
       setShowDeleteDialog(false);
       setUserToDelete(null);
-       // Optionally clear message after a few seconds
        setTimeout(() => {
         setActionStates(prev => ({ ...prev, [userIdToDelete]: { ...prev[userIdToDelete], message: '' } }));
       }, 3000);
     } catch (err) {
       console.error("Error deleting user (client):", err);
-      // @ts-ignore
       setActionStates(prev => ({
         ...prev,
-        // @ts-ignore
         [userIdToDelete]: { isLoading: false, message: '', error: err.message || "Failed to delete user." }
       }));
-      // Keep dialog open on error to show error within dialog, or close and show general error
-      // For now, let's keep it simple and let errors show next to the row after dialog closes.
-      // Or, we could add specific error state for the dialog itself.
-      // For now, if error occurs, it will show on the row after dialog closes.
       setShowDeleteDialog(false);
     } finally {
       setIsDeleting(false);

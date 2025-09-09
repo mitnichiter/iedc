@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth } from '@/lib/firebase';
 import {
   Table,
   TableBody,
@@ -100,12 +100,16 @@ export default function RegistrationsList({ eventId }) {
   const [filter, setFilter] = useState('all');
 
   const fetchRegistrations = useCallback(async () => {
+    if (!auth.currentUser) return;
     setIsLoading(true);
     try {
-      const functions = getFunctions();
-      const getEventRegistrations = httpsCallable(functions, 'getEventRegistrations');
-      const result = await getEventRegistrations({ eventId });
-      setRegistrations(result.data);
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/events/${eventId}/registrations`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch registrations.');
+      const data = await response.json();
+      setRegistrations(data);
     } catch (err) {
       setError(err.message);
       console.error("Error fetching registrations:", err);
@@ -121,15 +125,53 @@ export default function RegistrationsList({ eventId }) {
   }, [eventId, fetchRegistrations]);
 
   const handleVerify = async (registrationId, status) => {
+    if (!auth.currentUser) {
+      alert("You must be logged in to perform this action.");
+      return;
+    }
     try {
-        const functions = getFunctions();
-        const verifyRegistration = httpsCallable(functions, 'verifyRegistration');
-        await verifyRegistration({ eventId, registrationId, newStatus: status });
-        // Refresh the list after verification
-        fetchRegistrations();
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/events/${eventId}/registrations/${registrationId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newStatus: status }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update status.');
+      }
+      fetchRegistrations(); // Refresh list
     } catch (error) {
-        console.error("Error verifying registration:", error);
-        alert(`Failed to verify registration: ${error.message}`);
+      console.error("Error verifying registration:", error);
+      alert(`Failed to verify registration: ${error.message}`);
+    }
+  };
+
+  const handleDelete = async (registrationId) => {
+    if (!auth.currentUser) {
+      alert("You must be logged in to perform this action.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this registration permanently? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/events/${eventId}/registrations/${registrationId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete registration.');
+      }
+      fetchRegistrations(); // Refresh list
+    } catch (error) {
+      console.error("Error deleting registration:", error);
+      alert(`Failed to delete registration: ${error.message}`);
     }
   };
 
@@ -173,8 +215,9 @@ export default function RegistrationsList({ eventId }) {
                     {reg.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
                   <VerificationModal registration={reg} onVerify={handleVerify} />
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(reg.id)}>Delete</Button>
                 </TableCell>
               </TableRow>
             ))

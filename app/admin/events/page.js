@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -56,12 +56,16 @@ export default function EventsPage() {
   const router = useRouter();
 
   const fetchEvents = async () => {
+    if (!auth.currentUser) return;
     setIsLoading(true);
     try {
-      const functions = getFunctions();
-      const getEvents = httpsCallable(functions, 'getEvents');
-      const result = await getEvents();
-      setEvents(result.data);
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch('/api/admin/events', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch events.');
+      const data = await response.json();
+      setEvents(data);
     } catch (err) {
       setError(err.message);
       console.error("Error fetching events:", err);
@@ -71,8 +75,8 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    if(auth.currentUser) fetchEvents();
+  }, [auth.currentUser]);
 
   const handleDeleteClick = (event) => {
     setSelectedEvent(event);
@@ -80,34 +84,44 @@ export default function EventsPage() {
   };
 
   const handleViewParticipants = async (event) => {
+    if (!auth.currentUser) return;
     setSelectedEvent(event);
     setIsLoadingParticipants(true);
     setShowParticipantsModal(true);
     try {
-        const functions = getFunctions();
-        const getEventRegistrations = httpsCallable(functions, 'getEventRegistrations');
-        const result = await getEventRegistrations({ eventId: event.id });
-        const verifiedRegistrations = result.data.filter(reg => reg.status === 'verified');
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch(`/api/admin/events/${event.id}/registrations`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch participants.');
+        const result = await response.json();
+        const verifiedRegistrations = result.filter(reg => reg.status === 'verified');
         setParticipants(verifiedRegistrations);
     } catch (err) {
         console.error("Error fetching participants:", err);
-        // TODO: show error in modal
+        setError(err.message); // Show error in modal
     } finally {
         setIsLoadingParticipants(false);
     }
   };
 
   const handleConfirmDelete = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent || !auth.currentUser) return;
     setIsDeleting(true);
     try {
-      const functions = getFunctions();
-      const deleteEvent = httpsCallable(functions, 'deleteEvent');
-      await deleteEvent({ eventId: selectedEvent.id });
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`/api/admin/events/${selectedEvent.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete event.');
+      }
       fetchEvents(); // Refresh the list
     } catch (err) {
       console.error("Error deleting event:", err);
-      // TODO: Show error toast
+      setError(err.message); // Show error
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);

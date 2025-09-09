@@ -14,7 +14,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, User, Library, Layers3, LogOut, LayoutGrid, ListChecks, Menu, Settings, Calendar, ArrowRight } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // This is the actual content component for the dashboard
 const DashboardPage = () => {
@@ -47,12 +46,14 @@ const DashboardPage = () => {
           }
         }
 
-        // Now fetch events with the determined role
+        // Now fetch events
         try {
-          const functions = getFunctions();
-          const getPublicEvents = httpsCallable(functions, 'getPublicEvents');
-          const result = await getPublicEvents({ userRole });
-          setUpcomingEvents(result.data);
+          const response = await fetch('/api/events/public');
+          if (!response.ok) {
+            throw new Error('Failed to fetch events.');
+          }
+          const data = await response.json();
+          setUpcomingEvents(data);
         } catch (error) {
           console.error("Error fetching upcoming events:", error);
         } finally {

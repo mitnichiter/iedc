@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth } from '@/lib/firebase'; // Import auth for getting the token
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,12 +35,24 @@ export default function EventDetailsPage() {
     if (!eventId) return;
 
     const fetchEvent = async () => {
+      if (!auth.currentUser) {
+        // Wait for auth state to be ready
+        setTimeout(fetchEvent, 100);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const functions = getFunctions();
-        const getEvent = httpsCallable(functions, 'getEvent');
-        const result = await getEvent({ eventId });
-        setEvent(result.data);
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch(`/api/admin/events/${eventId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch event.');
+        }
+        const data = await response.json();
+        setEvent(data);
       } catch (err) {
         setError(err.message);
         console.error("Error fetching event:", err);
@@ -50,7 +62,7 @@ export default function EventDetailsPage() {
     };
 
     fetchEvent();
-  }, [eventId]);
+  }, [eventId, auth.currentUser]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading event details...</div>;

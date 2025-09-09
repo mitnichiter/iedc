@@ -7,7 +7,6 @@ import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -121,9 +120,22 @@ export default function RegistrationPage() {
       const registrationData = { ...values };
       delete registrationData.paymentScreenshot;
 
-      const functions = getFunctions();
-      const registerForEvent = httpsCallable(functions, 'registerForEvent');
-      await registerForEvent({ eventId, registrationData, screenshotUrl });
+      const headers = { 'Content-Type': 'application/json' };
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/events/${eventId}/register`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ registrationData, screenshotUrl }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to register.');
+      }
 
       alert("Registration successful! You will receive an email once your payment is verified.");
       router.push(`/events/${eventId}`);

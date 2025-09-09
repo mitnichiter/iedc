@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -53,9 +52,13 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
     setIsLoading(true);
     setError(null);
     try {
-      const functions = getFunctions();
-      const sendOtp = httpsCallable(functions, 'sendLoginOtp');
-      await sendOtp({ email });
+      const response = await fetch('/api/auth/login/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to send OTP.');
       setStep('otp');
     } catch (err) {
       console.error("Error sending OTP:", err);
@@ -69,11 +72,15 @@ export default function LoginModal({ isOpen, onOpenChange, onLoginSuccess }) {
     setIsLoading(true);
     setError(null);
     try {
-      const functions = getFunctions();
-      const login = httpsCallable(functions, 'loginWithPasswordAndOtp');
-      const result = await login({ email: values.email, password: values.password, otp: values.otp });
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email, password: values.password, otp: values.otp }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Login failed.');
 
-      const token = result.data.token;
+      const token = result.token;
       await signInWithCustomToken(auth, token);
 
       onLoginSuccess();

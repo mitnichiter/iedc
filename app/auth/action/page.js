@@ -7,7 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { auth } from '@/lib/firebase';
 import { verifyPasswordResetCode, confirmPasswordReset, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -75,10 +74,21 @@ function PasswordResetComponent() {
       // After successful reset, sign in the user to get an auth token
       const userCredential = await signInWithEmailAndPassword(auth, email, data.password);
       if (userCredential.user) {
-        // Now call the cloud function to set the password hash
-        const functions = getFunctions();
-        const setPassword = httpsCallable(functions, 'setPassword');
-        await setPassword({ password: data.password });
+        const token = await userCredential.user.getIdToken();
+        // Now call the new API route to set the password hash
+        const response = await fetch('/api/auth/set-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ password: data.password })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to finalize password update.');
+        }
       }
 
       setStep('success');

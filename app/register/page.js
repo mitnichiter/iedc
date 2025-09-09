@@ -2,8 +2,7 @@
 "use client";
 import Link from 'next/link';
 import { useState } from "react";
-import { auth, db, app } from "@/lib/firebase"; // Import app for functions
-import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase Functions tools
+import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -52,8 +51,6 @@ export default function RegisterPage() {
   const [otpMessage, setOtpMessage] = useState(""); // <-- ADDED FOR OTP MESSAGES
   const [otpError, setOtpError] = useState(""); // <-- ADDED FOR OTP ERRORS
 
-  const functions = getFunctions(app); // Initialize Firebase Functions
-
   const handleSendOtp = async () => {
     if (!email) {
       setOtpError("Please enter your email address.");
@@ -63,20 +60,18 @@ export default function RegisterPage() {
     setOtpMessage("");
     setOtpError("");
     try {
-      const sendOtpFunction = httpsCallable(functions, 'sendRegistrationEmailOtp');
-      const result = await sendOtpFunction({ email });
-      // @ts-ignore
-      if (result.data.success) {
-      // @ts-ignore
-        setOtpMessage(result.data.message);
-        setOtpSent(true);
-      } else {
-      // @ts-ignore
-        setOtpError(result.data.message || "Failed to send OTP.");
-      }
+      const response = await fetch('/api/auth/register/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to send OTP.");
+
+      setOtpMessage(result.message);
+      setOtpSent(true);
     } catch (error) {
       console.error("Send OTP error:", error);
-      // @ts-ignore
       setOtpError(error.message || "An error occurred while sending OTP.");
     } finally {
       setIsLoading(false);
@@ -92,21 +87,19 @@ export default function RegisterPage() {
     setOtpMessage("");
     setOtpError("");
     try {
-      const verifyOtpFunction = httpsCallable(functions, 'verifyRegistrationEmailOtp');
-      const result = await verifyOtpFunction({ email, otp });
-      // @ts-ignore
-      if (result.data.success) {
-      // @ts-ignore
-        setOtpMessage(result.data.message);
-        setOtpVerified(true);
-        setOtpSent(false); // OTP is verified, can hide OTP input now
-      } else {
-      // @ts-ignore
-        setOtpError(result.data.message || "OTP verification failed.");
-      }
+      const response = await fetch('/api/auth/register/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "OTP verification failed.");
+
+      setOtpMessage(result.message);
+      setOtpVerified(true);
+      setOtpSent(false);
     } catch (error) {
       console.error("Verify OTP error:", error);
-      // @ts-ignore
       setOtpError(error.message || "An error occurred during OTP verification.");
     } finally {
       setIsLoading(false);
@@ -147,10 +140,17 @@ export default function RegisterPage() {
         interests: finalInterests,
       };
 
-      const createUser = httpsCallable(functions, 'createUserWithPassword');
-      await createUser({ email, password, userData });
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, userData }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Registration failed.');
 
       alert('Registration successful! Your account is pending admin approval.');
+      router.push('/register/login');
     } catch (error) {
       console.error("Error during registration:", error);
       alert(`Registration failed: ${error.message}`);

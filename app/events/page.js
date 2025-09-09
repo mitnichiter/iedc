@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowRight } from 'lucide-react';
@@ -17,10 +16,12 @@ export default function EventsListPage() {
         const fetchEvents = async () => {
             setIsLoading(true);
             try {
-                const functions = getFunctions();
-                const getPublicEvents = httpsCallable(functions, 'getPublicEvents');
-                const result = await getPublicEvents();
-                setEvents(result.data);
+                const response = await fetch('/api/events/public');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch events.');
+                }
+                const data = await response.json();
+                setEvents(data);
             } catch (err) {
                 console.error("Error fetching public events:", err);
                 setError(err.message);

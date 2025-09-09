@@ -6,8 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase'; // Import auth for getting the token
 
 import { Button } from "@/components/ui/button";
 import {
@@ -98,23 +97,21 @@ export default function EditEventPage() {
   });
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!eventId || !auth.currentUser) return;
     const fetchEvent = async () => {
         try {
-            const functions = getFunctions();
-            const getEvent = httpsCallable(functions, 'getEvent');
-            const result = await getEvent({ eventId });
-            const eventData = result.data;
+            const token = await auth.currentUser.getIdToken();
+            const response = await fetch(`/api/admin/events/${eventId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch event data.');
+            const eventData = await response.json();
             setEvent(eventData);
 
-            // Format dates for the native date input which expects YYYY-MM-DD
             const formatDateForInput = (dateString) => {
               if (!dateString) return '';
               const date = new Date(dateString);
-              const year = date.getFullYear();
-              const month = (date.getMonth() + 1).toString().padStart(2, '0');
-              const day = date.getDate().toString().padStart(2, '0');
-              return `${year}-${month}-${day}`;
+              return date.toISOString().split('T')[0]; // YYYY-MM-DD
             }
 
             form.reset({
@@ -126,8 +123,9 @@ export default function EditEventPage() {
             console.error("Error fetching event for edit:", error);
         }
     };
-    fetchEvent();
-  }, [eventId, form]);
+    // Re-run if the user logs in
+    if(auth.currentUser) fetchEvent();
+  }, [eventId, form, auth.currentUser]);
 
   async function onSubmit(values) {
     setIsSubmitting(true);
@@ -152,9 +150,22 @@ export default function EditEventPage() {
       }
       delete eventData.banner;
 
-      const functions = getFunctions();
-      const updateEvent = httpsCallable(functions, 'updateEvent');
-      await updateEvent(eventData);
+      if (!auth.currentUser) throw new Error("User not authenticated.");
+      const token = await auth.currentUser.getIdToken();
+
+      const response = await fetch(`/api/admin/events/${eventId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(eventData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update event.');
+      }
 
       console.log("Event updated successfully!");
       router.push(`/admin/events/${eventId}`);

@@ -6,8 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '@/lib/firebase'; // Assuming db is exported from firebase.js
+import { app, auth } from '@/lib/firebase'; // Import auth for getting the token
 
 import { Button } from "@/components/ui/button";
 import {
@@ -126,10 +125,25 @@ export default function CreateEventPage() {
       }
       delete eventData.banner; // Remove banner file from data object
 
-      // 3. Call the 'createEvent' cloud function
-      const functions = getFunctions();
-      const createEvent = httpsCallable(functions, 'createEvent');
-      await createEvent(eventData);
+      // 3. Call the new API route
+      if (!auth.currentUser) {
+        throw new Error("User not authenticated. Cannot create event.");
+      }
+      const token = await auth.currentUser.getIdToken();
+
+      const response = await fetch('/api/admin/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(eventData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create event.');
+      }
 
       // 4. Handle success
       console.log("Event created successfully!");
