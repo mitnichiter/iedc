@@ -1,0 +1,90 @@
+Objective: Refactor the IEDC-WEBSITE project to eliminate the dependency on Firebase Cloud Functions. Migrate all backend logic to Vercel Serverless Functions (Next.js API Routes) and transition the email service to use Nodemailer with Google Workspace's SMTP relay.
+Core Architectural Changes:
+Backend Migration: All server-side logic currently located in functions/index.js must be moved into the Next.js app/api/ directory. Each Firebase Callable Function will be replaced by a corresponding RESTful API route.
+Email Service Migration: The email-sending functionality will be handled by a Nodemailer transport configured for Google Workspace SMTP. This will be managed within the Vercel environment, using environment variables for credentials.
+Detailed Implementation Plan:
+Step 1: Set Up the New Emailing Service
+Create a new file: lib/nodemailer.js.
+Inside this file, configure and export a Nodemailer transporter object. This transporter should be set up to use the Google Workspace SMTP relay (smtp.gmail.com, port 465, secure).
+The auth object for the transporter should use two new environment variables: GMAIL_EMAIL (your full Google Workspace email address) and GMAIL_APP_PASSWORD (a 16-character App Password generated from your Google account). Do not hardcode these values.
+Update your environment files (.env.local) to include these new variables.
+Step 2: Migrate Firebase Functions to Vercel API Routes
+For each function in functions/index.js, create a corresponding API route in app/api/. You must handle authentication manually in each protected route.
+Authentication Pattern for Protected API Routes:
+The frontend must send the user's Firebase Auth ID token in the Authorization header of the fetch request (e.g., Authorization: Bearer <token>).
+The API route on the backend must:
+Initialize the Firebase Admin SDK.
+Read the Bearer token from the Authorization header.
+Use admin.auth().verifyIdToken(token) to verify the token and extract the user's uid and customClaims (like the role).
+If the token is invalid or the role is insufficient, return a 401 Unauthorized or 403 Forbidden error.
+Migration Map:
+getPublicEvents -> app/api/events/public/route.js (Method: GET)
+getEvents (Admin) -> app/api/admin/events/route.js (Method: GET, requires admin role)
+getEvent (Admin) -> app/api/admin/events/[eventId]/route.js (Method: GET, requires admin role)
+createEvent -> app/api/admin/events/route.js (Method: POST, requires admin role)
+updateEvent -> app/api/admin/events/[eventId]/route.js (Method: PUT, requires admin role)
+deleteEvent -> app/api/admin/events/[eventId]/route.js (Method: DELETE, requires admin role)
+registerForEvent -> app/api/events/[eventId]/register/route.js (Method: POST, public)
+getEventRegistrations -> app/api/admin/events/[eventId]/registrations/route.js (Method: GET, requires admin role)
+verifyRegistration -> app/api/admin/events/[eventId]/registrations/[registrationId]/route.js (Method: POST, requires admin role, use the nodemailer transporter from lib/nodemailer.js to send status emails)
+approveUser -> app/api/admin/members/[userId]/approve/route.js (Method: POST, requires admin role)
+setUserRole -> app/api/admin/members/[userId]/role/route.js (Method: POST, requires admin role)
+deleteUserAccount -> app/api/admin/members/[userId]/route.js (Method: DELETE, requires admin role)
+grantAdminRole -> app/api/admin/users/grant-admin/route.js (Method: POST, requires admin role)
+Authentication Functions: Recreate the logic for sending OTPs and creating/logging in users within new API routes.
+sendRegistrationEmailOtp -> app/api/auth/register/send-otp/route.js (Method: POST)
+verifyRegistrationEmailOtp -> app/api/auth/register/verify-otp/route.js (Method: POST)
+createUserWithPassword -> app/api/auth/register/route.js (Method: POST)
+sendLoginOtp -> app/api/auth/login/send-otp/route.js (Method: POST)
+loginWithPasswordAndOtp -> app/api/auth/login/route.js (Method: POST)
+setPassword -> app/api/auth/set-password/route.js (Method: POST, requires user auth)
+Step 3: Refactor Frontend Components
+Go through every file that uses httpsCallable from the firebase/functions SDK. Replace these calls with fetch requests to the newly created API routes.
+Example Change in app/admin/events/page.js:
+From: const getEvents = httpsCallable(functions, 'getEvents'); const result = await getEvents();
+To: const response = await fetch('/api/admin/events', { headers: { 'Authorization': \Bearer ${await user.getIdToken()}` } }); const result = await response.json();`
+Step 4: Cleanup
+Once all logic has been migrated and tested, delete the entire functions directory.
+Update the firebase.json file to remove the "functions" configuration block.
+Remove the firebase-functions and firebase-admin dependencies from the root package.json if they are no longer needed anywhere else (they will need to be added as dependencies for the main project since API routes run in the Next.js server environment).
+File Impact Analysis
+This is the list of files that will be created, modified, or deleted during this refactoring process.
+Files to Create:
+lib/nodemailer.js
+app/api/events/public/route.js
+app/api/admin/events/route.js
+app/api/admin/events/[eventId]/route.js
+app/api/events/[eventId]/register/route.js
+app/api/admin/events/[eventId]/registrations/route.js
+app/api/admin/events/[eventId]/registrations/[registrationId]/route.js
+app/api/admin/members/[userId]/approve/route.js
+app/api/admin/members/[userId]/role/route.js
+app/api/admin/members/[userId]/route.js
+app/api/admin/users/grant-admin/route.js
+app/api/auth/register/send-otp/route.js
+app/api/auth/register/verify-otp/route.js
+app/api/auth/register/route.js
+app/api/auth/login/send-otp/route.js
+app/api/auth/login/route.js
+app/api/auth/set-password/route.js
+Files to Modify:
+.env.local (or create it): Add GMAIL_EMAIL and GMAIL_APP_PASSWORD.
+package.json: Add firebase-admin and nodemailer as main project dependencies.
+app/admin/events/create/page.js: Replace httpsCallable with fetch.
+app/admin/events/[eventId]/edit/page.js: Replace httpsCallable with fetch.
+app/admin/events/[eventId]/page.js: Replace httpsCallable with fetch.
+app/admin/events/[eventId]/RegistrationsList.js: Replace httpsCallable with fetch.
+app/admin/events/page.js: Replace httpsCallable with fetch.
+app/admin/givesr/page.js: Replace httpsCallable with fetch.
+app/admin/members/[userId]/page.js: Replace httpsCallable with fetch.
+app/admin/members/page.js: Replace httpsCallable with fetch.
+app/auth/action/page.js: Replace httpsCallable with fetch.
+app/dashboard/page.js: Replace httpsCallable with fetch.
+app/events/[eventId]/register/page.js: Replace httpsCallable with fetch.
+app/events/page.js: Replace httpsCallable with fetch.
+app/register/login/page.js: Replace httpsCallable with fetch.
+app/register/page.js: Replace httpsCallable with fetch.
+components/auth/LoginModal.js: Replace httpsCallable with fetch.
+firebase.json: Remove the functions block.
+Files/Folders to Delete:
+The entire functions directory.
