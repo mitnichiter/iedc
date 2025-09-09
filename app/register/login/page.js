@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 // We still need useAuth for the initial loading check, but not for the redirect effect
 import { useAuth } from '@/lib/AuthContext';
 import { app, auth } from "@/lib/firebase";
-import { getFunctions, httpsCallable } from "firebase/functions";
 // Import the session management tools
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -27,8 +26,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const functions = getFunctions(app);
-
   useEffect(() => {
     // Only redirect if auth is not loading, a user is authenticated globally,
     // AND we are not in the middle of an active login attempt on this page.
@@ -47,13 +44,24 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setPendingUser(userCredential.user);
 
-      const sendOtp = httpsCallable(functions, 'sendEmailOtp');
-      await sendOtp({});
+      const token = await userCredential.user.getIdToken();
+      const response = await fetch('/api/auth/login/send-otp', {
+          method: 'POST',
+          headers: {
+              'Authorization': `Bearer ${token}`
+          }
+      });
+
+      if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || 'Failed to send OTP.');
+      }
       
       setLoginStep("otp"); // This will now work without being interrupted
     } catch (error) {
       console.error("Credential Login Error:", error);
-      setError("Invalid email or password.");
+      // @ts-ignore
+      setError(error.message || "Invalid email or password.");
     } finally {
       setIsLoading(false);
     }
@@ -67,8 +75,22 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
     try {
-      const verifyOtp = httpsCallable(functions, 'verifyEmailOtp');
-      await verifyOtp({ userId: pendingUser.uid, otp });
+      // @ts-ignore
+      const token = await pendingUser.getIdToken();
+      const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ otp })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+          throw new Error(result.error || 'Invalid or expired OTP.');
+      }
 
       // Upgrade the session to be permanent
       await setPersistence(auth, browserLocalPersistence);
@@ -79,7 +101,8 @@ export default function LoginPage() {
 
     } catch (error) {
       console.error("OTP Verification Error:", error);
-      setError("Invalid or expired OTP. Please try again.");
+      // @ts-ignore
+      setError(error.message);
       auth.signOut();
       setLoginStep('credentials');
       setPendingUser(null);

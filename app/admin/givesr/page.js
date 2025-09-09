@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app, auth } from "@/lib/firebase"; // auth is for getting current user's UID easily
 import { useAuth } from "@/lib/AuthContext"; // To get current user easily for pre-filling
 
 const GrantAdminRolePageContent = () => {
@@ -15,9 +13,6 @@ const GrantAdminRolePageContent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  const functions = getFunctions(app);
-  const grantAdminRoleFunction = httpsCallable(functions, 'grantAdminRole');
 
   // Pre-fill targetUid if current user is available (useful if admin wants to make themselves admin)
   useState(() => {
@@ -32,21 +27,38 @@ const GrantAdminRolePageContent = () => {
       setError("Please enter the User ID (UID) of the user to make admin.");
       return;
     }
+    if (!currentUser) {
+        setError("You must be logged in to perform this action.");
+        return;
+    }
     setIsLoading(true);
     setMessage("");
     setError("");
 
     try {
-      const result = await grantAdminRoleFunction({ uid: targetUid });
-      // @ts-ignore
-      setMessage(result.data.message);
-      setTargetUid(""); // Clear input on success
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/admin/users/grant-admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ uid: targetUid })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'An unexpected error occurred.');
+        }
+
+        setMessage(result.message);
+        setTargetUid(""); // Clear input on success
     } catch (err) {
-      console.error("Error calling grantAdminRole function:", err);
-      // @ts-ignore
-      setError(err.message || "An unexpected error occurred.");
+        console.error("Error calling grantAdminRole function:", err);
+        setError(err.message);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 

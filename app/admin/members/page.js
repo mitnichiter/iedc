@@ -4,42 +4,24 @@ import { useState, useEffect } from "react";
 import Link from 'next/link';
 import { db, app } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import AdminRoute from "@/components/auth/AdminRoute";
+import { useAuth } from "@/lib/AuthContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from "@/components/ui/alert-dialog"; // Added AlertDialog components
-// Re-using AdminLayout by wrapping content.
-// This assumes AdminLayout is structured to take children, which it is from previous step.
-// However, for Next.js App Router, pages are typically self-contained or use a layout.js file.
-// For simplicity here, we'll import the Layout directly if it's default exported from admin page,
-// or re-create a similar structure if not.
-// Let's assume we can't directly import AdminLayout from 'app/admin/page.js' due to it being a page.
-// We'll define a local AdminLayout wrapper or expect one from a shared components folder.
-// For now, to keep it simple, this page will render its content, and rely on a potential `app/admin/layout.js` for overall structure.
-// If `app/admin/layout.js` is not created yet, this page might look unstyled initially without the admin navbar.
-// Let's proceed by creating the content first. The layout can be applied via `app/admin/layout.js`.
-// AdminRoute is removed from here as it's handled by app/admin/layout.js
-
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye } from "lucide-react"; // For view details button
+import { Eye } from "lucide-react";
 
 const MembersListPageContent = () => {
+  const { user: loggedInAdmin } = useAuth();
   const [users, setUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // For initial table load
-  const [error, setError] = useState(null); // For initial table load error
-  const [actionStates, setActionStates] = useState({}); // To track loading/message for individual rows
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionStates, setActionStates] = useState({});
 
-  // State for Delete User Dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null); // Stores { id: string, fullName: string }
-  const [isDeleting, setIsDeleting] = useState(false); // For delete button loading state in dialog
-
-  const functions = getFunctions(app);
-  const approveUserFunction = httpsCallable(functions, 'approveUser');
-  const deleteUserAccountFunction = httpsCallable(functions, 'deleteUserAccount');
-
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -64,24 +46,34 @@ const MembersListPageContent = () => {
   }, []);
 
   const handleApproveUser = async (userIdToApprove) => {
+    if (!loggedInAdmin) {
+        setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: '', error: 'You must be logged in.' } }));
+        return;
+    }
     setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: true, message: '', error: '' } }));
     try {
-      // @ts-ignore
-      const result = await approveUserFunction({ userIdToApprove });
-      setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: result.data.message, error: '' } }));
-      // Update user status locally for immediate UI update
-      setUsers(prevUsers => prevUsers.map(u =>
-        // @ts-ignore
-        u.id === userIdToApprove ? { ...u, status: 'approved' } : u
-      ));
-      // Optionally clear message after a few seconds
-      setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [userIdToApprove]: { ...prev[userIdToApprove], message: '' } }));
-      }, 3000);
+        const token = await loggedInAdmin.getIdToken();
+        const response = await fetch(`/api/admin/members/${userIdToApprove}/approve`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to approve user.');
+        }
+        setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: result.message, error: '' } }));
+        setUsers(prevUsers => prevUsers.map(u =>
+            // @ts-ignore
+            u.id === userIdToApprove ? { ...u, status: 'approved' } : u
+        ));
+        setTimeout(() => {
+            setActionStates(prev => ({ ...prev, [userIdToApprove]: { ...prev[userIdToApprove], message: '' } }));
+        }, 3000);
     } catch (err) {
-      console.error("Error approving user (client):", err);
-      // @ts-ignore
-      setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: '', error: err.message || "Failed to approve." } }));
+        // @ts-ignore
+        setActionStates(prev => ({ ...prev, [userIdToApprove]: { isLoading: false, message: '', error: err.message } }));
     }
   };
 
@@ -89,48 +81,51 @@ const MembersListPageContent = () => {
     // @ts-ignore
     setUserToDelete({ id: userId, fullName: userName });
     setShowDeleteDialog(true);
-    // Clear any previous general errors for this action from other rows
     setActionStates(prev => ({ ...prev, [userId]: { ...prev[userId], error: '' } }));
   };
 
   const handleDeleteUserConfirm = async () => {
-    if (!userToDelete) return;
+    // @ts-ignore
+    if (!userToDelete || !loggedInAdmin) return;
 
     // @ts-ignore
     const { id: userIdToDelete } = userToDelete;
     setIsDeleting(true);
     setActionStates(prev => ({ ...prev, [userIdToDelete]: { isLoading: true, message: '', error: '' } }));
 
-
     try {
-      // @ts-ignore
-      await deleteUserAccountFunction({ userIdToDelete });
-      setActionStates(prev => ({
-        ...prev,
-        [userIdToDelete]: { isLoading: false, message: "User deleted successfully.", error: '' }
-      }));
-      setUsers(prevUsers => prevUsers.filter(u => u.id !== userIdToDelete)); // Remove user from local list
-      setShowDeleteDialog(false);
-      setUserToDelete(null);
-       // Optionally clear message after a few seconds
-       setTimeout(() => {
-        setActionStates(prev => ({ ...prev, [userIdToDelete]: { ...prev[userIdToDelete], message: '' } }));
-      }, 3000);
+        const token = await loggedInAdmin.getIdToken();
+        const response = await fetch(`/api/admin/members/${userIdToDelete}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Failed to delete user.');
+        }
+
+        setActionStates(prev => ({
+            ...prev,
+            [userIdToDelete]: { isLoading: false, message: "User deleted successfully.", error: '' }
+        }));
+        setUsers(prevUsers => prevUsers.filter(u => u.id !== userIdToDelete));
+        setShowDeleteDialog(false);
+        setUserToDelete(null);
+        setTimeout(() => {
+            setActionStates(prev => ({ ...prev, [userIdToDelete]: { ...prev[userIdToDelete], message: '' } }));
+        }, 3000);
     } catch (err) {
-      console.error("Error deleting user (client):", err);
-      // @ts-ignore
-      setActionStates(prev => ({
-        ...prev,
-        // @ts-ignore
-        [userIdToDelete]: { isLoading: false, message: '', error: err.message || "Failed to delete user." }
-      }));
-      // Keep dialog open on error to show error within dialog, or close and show general error
-      // For now, let's keep it simple and let errors show next to the row after dialog closes.
-      // Or, we could add specific error state for the dialog itself.
-      // For now, if error occurs, it will show on the row after dialog closes.
-      setShowDeleteDialog(false);
+        setActionStates(prev => ({
+            ...prev,
+            // @ts-ignore
+            [userIdToDelete]: { isLoading: false, message: '', error: err.message }
+        }));
+        setShowDeleteDialog(false);
     } finally {
-      setIsDeleting(false);
+        setIsDeleting(false);
     }
   };
 

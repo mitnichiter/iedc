@@ -25,8 +25,6 @@ import {
 } from "@/components/ui/alert-dialog"; // For Delete Confirmation
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // For Role Select
 import { Label } from "@/components/ui/label"; // For Dialog
-import { getFunctions, httpsCallable } from "firebase/functions"; // For calling functions
-import { app } from "@/lib/firebase"; // Firebase app instance for functions
 import Link from "next/link";
 
 
@@ -55,8 +53,6 @@ const UserDetailPageContent = () => {
 
   const [copied, setCopied] = useState(false); // For copy UID button feedback
 
-  const functions = getFunctions(app);
-
   // const isSuperAdmin check is no longer needed here for these UI elements
   // const isSuperAdmin = loggedInAdmin && loggedInAdmin.customClaims && loggedInAdmin.customClaims.role === 'superadmin';
 
@@ -80,56 +76,84 @@ const UserDetailPageContent = () => {
 
   const handleRoleChange = async () => {
     if (!selectedRole) {
-      setRoleUpdateError("Please select a role.");
-      return;
+        setRoleUpdateError("Please select a role.");
+        return;
+    }
+    if (!loggedInAdmin) {
+        setRoleUpdateError("You must be logged in to perform this action.");
+        return;
     }
     setIsUpdatingRole(true);
     setRoleUpdateMessage("");
     setRoleUpdateError("");
 
     try {
-      const setUserRoleFunction = httpsCallable(functions, 'setUserRole');
-      // @ts-ignore
-      await setUserRoleFunction({ userIdToUpdate: userId, newRole: selectedRole });
-      setRoleUpdateMessage("User role updated successfully!");
+        const token = await loggedInAdmin.getIdToken();
+        const response = await fetch(`/api/admin/members/${userId}/role`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ newRole: selectedRole })
+        });
 
-      // Update local state to reflect change immediately
-      // @ts-ignore
-      setUserDetail(prev => ({ ...prev, role: selectedRole }));
+        const result = await response.json();
 
-      setTimeout(() => {
-        setShowChangeRoleDialog(false);
-        setRoleUpdateMessage("");
-      }, 2000);
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to update role.');
+        }
+
+        setRoleUpdateMessage("User role updated successfully!");
+        // @ts-ignore
+        setUserDetail(prev => ({ ...prev, role: selectedRole }));
+
+        setTimeout(() => {
+            setShowChangeRoleDialog(false);
+            setRoleUpdateMessage("");
+        }, 2000);
 
     } catch (err) {
-      console.error("Error updating role:", err);
-      // @ts-ignore
-      setRoleUpdateError(err.message || "Failed to update role.");
+        console.error("Error updating role:", err);
+        // @ts-ignore
+        setRoleUpdateError(err.message);
     } finally {
-      setIsUpdatingRole(false);
+        setIsUpdatingRole(false);
     }
   };
 
   const handleDeleteUser = async () => {
+    if (!loggedInAdmin) {
+        setDeleteUserError("You must be logged in to perform this action.");
+        setShowDeleteUserDialog(false);
+        return;
+    }
     setIsDeletingUser(true);
-    setDeleteUserMessage(""); // Clear previous general messages
+    setDeleteUserMessage("");
     setDeleteUserError("");
 
     try {
-      const deleteUserFunction = httpsCallable(functions, 'deleteUserAccount');
-      // @ts-ignore
-      await deleteUserFunction({ userIdToDelete: userId });
-      // No need to set success message here as we will redirect
-      // For a brief moment a success toast could be shown if desired, but router.push is quick
-      router.push('/admin/members?deleted=true'); // Redirect to members list with a query param
+        const token = await loggedInAdmin.getIdToken();
+        const response = await fetch(`/api/admin/members/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Failed to delete user.');
+        }
+
+        router.push('/admin/members?deleted=true');
     } catch (err) {
-      console.error("Error deleting user:", err);
-      // @ts-ignore
-      setDeleteUserError(err.message || "Failed to delete user.");
-      setShowDeleteUserDialog(false); // Close dialog on error to show general error message
+        console.error("Error deleting user:", err);
+        // @ts-ignore
+        setDeleteUserError(err.message);
+        setShowDeleteUserDialog(false);
     } finally {
-      setIsDeletingUser(false);
+        setIsDeletingUser(false);
     }
   };
 
