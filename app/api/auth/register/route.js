@@ -37,7 +37,7 @@ export async function POST(request) {
       ...userData,
       uid: userRecord.uid,
       role: 'student',
-      status: 'pending', // Initial status, awaiting admin approval
+      status: 'pending_approval', // Initial status, awaiting admin approval
       createdAt: new Date().toISOString(),
       passwordHash: passwordHash, // Add the hashed password
     };
