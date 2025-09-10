@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminAuth, db } from '@/lib/firebase-admin';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request) {
   try {
@@ -28,13 +29,17 @@ export async function POST(request) {
     // 2. Set custom claim for role
     await adminAuth.setCustomUserClaims(userRecord.uid, { role: 'student' });
 
-    // 3. Save user data to Firestore
+    // 3. Hash password and save user data to Firestore
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
     const userDocData = {
       ...userData,
       uid: userRecord.uid,
       role: 'student',
       status: 'pending', // Initial status, awaiting admin approval
       createdAt: new Date().toISOString(),
+      passwordHash: passwordHash, // Add the hashed password
     };
     await db.collection('users').doc(userRecord.uid).set(userDocData);
 
