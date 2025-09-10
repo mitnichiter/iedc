@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { transporter } from '@/lib/nodemailer';
 import admin from 'firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 // Function to send verification/rejection emails, adapted for the API route
 async function sendRegistrationStatusEmail(userEmail, userName, eventName, status) {
@@ -34,6 +35,9 @@ async function sendRegistrationStatusEmail(userEmail, userName, eventName, statu
 // Handler for POST requests to verify/reject a registration
 export async function POST(request, { params }) {
     try {
+        const authResult = await verifyAuth(request, { requireAdmin: true });
+        if (authResult instanceof NextResponse) return authResult;
+
         const { eventId, registrationId } = params;
         const { newStatus } = await request.json();
 
@@ -67,6 +71,9 @@ export async function POST(request, { params }) {
 // Handler for DELETE requests to delete a registration
 export async function DELETE(request, { params }) {
     try {
+        const authResult = await verifyAuth(request, { requireAdmin: true });
+        if (authResult instanceof NextResponse) return authResult;
+
         const { eventId, registrationId } = params;
         if (!eventId || !registrationId) {
             return NextResponse.json({ success: false, message: 'Event ID and Registration ID are required.' }, { status: 400 });

@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import bcrypt from 'bcryptjs';
+import { verifyAuth } from '@/lib/auth-helper';
 
 export async function POST(request) {
   try {
-    // The middleware has already verified the user's token.
-    // We can get the user's UID from the decoded token in the header.
-    const decodedToken = JSON.parse(request.headers.get('x-decoded-token'));
-    const uid = decodedToken.uid;
-
-    if (!uid) {
-        // This should technically not be reached if middleware is effective
-        return NextResponse.json({ success: false, message: 'Authentication required.' }, { status: 401 });
-    }
+    const authResult = await verifyAuth(request); // No admin required
+    if (authResult instanceof NextResponse) return authResult;
+    const { uid } = authResult;
 
     const { password } = await request.json();
     if (!password || password.length < 6) {

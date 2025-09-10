@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 // Handler for GET requests to fetch a single event
 export async function GET(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { eventId } = params;
     if (!eventId) {
       return NextResponse.json({ success: false, message: 'Event ID is required.' }, { status: 400 });
@@ -34,6 +38,9 @@ export async function GET(request, { params }) {
 // Handler for PUT requests to update an event
 export async function PUT(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { eventId } = params;
     if (!eventId) {
       return NextResponse.json({ success: false, message: 'Event ID is required.' }, { status: 400 });
@@ -64,6 +71,9 @@ export async function PUT(request, { params }) {
 // Handler for DELETE requests to delete an event
 export async function DELETE(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { eventId } = params;
     if (!eventId) {
       return NextResponse.json({ success: false, message: 'Event ID is required.' }, { status: 400 });

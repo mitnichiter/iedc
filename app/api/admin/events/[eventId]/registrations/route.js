@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 export async function GET(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { eventId } = params;
     if (!eventId) {
       return NextResponse.json({ success: false, message: 'Event ID is required.' }, { status: 400 });

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 export async function POST(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { userId } = params;
     if (!userId) {
       return NextResponse.json({ success: false, message: 'User ID is required.' }, { status: 400 });

@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db, adminAuth } from '@/lib/firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 export async function DELETE(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { userId } = params;
     if (!userId) {
       return NextResponse.json({ success: false, message: 'User ID is required.' }, { status: 400 });
     }
 
     // As a safeguard, prevent a user from deleting themselves via this API.
-    // The middleware protects against non-admins, but an admin could call this on their own UID.
-    const decodedToken = JSON.parse(request.headers.get('x-decoded-token'));
-    if (decodedToken.uid === userId) {
+    if (authResult.uid === userId) {
         return NextResponse.json({ success: false, message: 'Admins cannot delete their own account through this function.' }, { status: 403 });
     }
 

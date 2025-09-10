@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 // Handler for GET requests to fetch all events for an admin
 export async function GET(request) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult; // Return error response
+
     const eventsSnapshot = await db.collection('events').orderBy('date', 'desc').get();
     const events = eventsSnapshot.docs.map(doc => {
       const data = doc.data();
@@ -27,8 +31,9 @@ export async function GET(request) {
 // Handler for POST requests to create a new event
 export async function POST(request) {
   try {
-    const decodedToken = JSON.parse(request.headers.get('x-decoded-token'));
-    const uid = decodedToken.uid;
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult; // Return error response
+    const { uid } = authResult; // Get UID from successful auth
 
     const {
       name, date, time, venue, description, bannerUrl, audience, registrationFee,

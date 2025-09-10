@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db, adminAuth } from '@/lib/firebase-admin';
+import { verifyAuth } from '@/lib/auth-helper';
 
 export async function POST(request, { params }) {
   try {
+    const authResult = await verifyAuth(request, { requireAdmin: true });
+    if (authResult instanceof NextResponse) return authResult;
+
     const { userId } = params;
     const { newRole } = await request.json();
 
