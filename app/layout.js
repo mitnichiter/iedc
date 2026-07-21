@@ -1,4 +1,5 @@
 // File: app/layout.js
+import "@/lib/polyfill";
 
 import { League_Spartan } from "next/font/google";
 import "./globals.css";

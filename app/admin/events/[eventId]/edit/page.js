@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth } from '@/lib/firebase'; // Import auth for getting the token
+import { supabase } from '@/lib/supabase';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +29,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 
-
 // 1. Define the validation schema with Zod
 const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters long." }),
@@ -44,13 +42,13 @@ const eventFormSchema = z.object({
   endDate: z.coerce.date().optional(),
   endTime: z.string().optional(),
   venue: z.string().min(2, { message: "Venue is required." }),
-  registrationFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }).default(0),
+  registration_fee: z.coerce.number().min(0, { message: "Fee cannot be negative." }).default(0), // Changed to snake_case to match DB
   audience: z.enum([
     "iedc-members",
     "carmel-students",
     "all-students",
   ], { required_error: "You must select a target audience." }),
-  banner: z.any().optional(), // Banner is optional on edit
+  banner: z.any().optional(), 
 }).refine(data => {
     if (data.endDate && data.date) {
         return data.endDate >= data.date;
@@ -97,16 +95,17 @@ export default function EditEventPage() {
   });
 
   useEffect(() => {
-    if (!eventId || !auth.currentUser) return;
+    if (!eventId) return;
     const fetchEvent = async () => {
         try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`/api/admin/events/${eventId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch event data.');
-            const eventData = await response.json();
-            setEvent(eventData);
+            const { data, error } = await supabase
+              .from('events')
+              .select('*')
+              .eq('id', eventId)
+              .single();
+
+            if (error) throw error;
+            setEvent(data);
 
             const formatDateForInput = (dateString) => {
               if (!dateString) return '';
@@ -115,63 +114,69 @@ export default function EditEventPage() {
             }
 
             form.reset({
-                ...eventData,
-                date: formatDateForInput(eventData.date),
-                endDate: eventData.endDate ? formatDateForInput(eventData.endDate) : '',
+                ...data,
+                date: formatDateForInput(data.date),
+                endDate: data.end_date ? formatDateForInput(data.end_date) : '',
+                endTime: data.end_time || '',
+                registration_fee: data.registration_fee || 0,
             });
         } catch (error) {
             console.error("Error fetching event for edit:", error);
         }
     };
-    // Re-run if the user logs in
-    if(auth.currentUser) fetchEvent();
-  }, [eventId, form, auth.currentUser]);
+    fetchEvent();
+  }, [eventId, form]);
 
   async function onSubmit(values) {
     setIsSubmitting(true);
     try {
-      let bannerUrl = event.bannerUrl;
+      let image_url = event.image_url;
+
       if (values.banner && values.banner.length > 0) {
         const bannerFile = values.banner[0];
-        const storage = getStorage();
-        const storageRef = ref(storage, `event-banners/${Date.now()}-${bannerFile.name}`);
-        const uploadResult = await uploadBytes(storageRef, bannerFile);
-        bannerUrl = await getDownloadURL(uploadResult.ref);
+        const fileName = `${Date.now()}-${bannerFile.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from('events')
+            .upload(fileName, bannerFile);
+        
+        if(uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('events')
+            .getPublicUrl(fileName);
+        
+        image_url = publicUrl;
       }
 
       const eventData = {
-        ...values,
-        bannerUrl,
+        name: values.name,
+        description: values.description,
         date: values.date.toISOString(),
-        eventId,
+        time: values.time,
+        venue: values.venue,
+        registration_fee: values.registration_fee,
+        audience: values.audience,
+        image_url: image_url,
+        end_date: values.endDate ? values.endDate.toISOString() : null,
+        end_time: values.endTime || null,
+        bypass_time_constraint: values.bypassTimeConstraint,
+        ask_for_instagram: values.askForInstagram
       };
-      if (values.endDate) {
-        eventData.endDate = values.endDate.toISOString();
-      }
-      delete eventData.banner;
 
-      if (!auth.currentUser) throw new Error("User not authenticated.");
-      const token = await auth.currentUser.getIdToken();
+      const { error } = await supabase
+        .from('events')
+        .update(eventData)
+        .eq('id', eventId);
 
-      const response = await fetch(`/api/admin/events/${eventId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(eventData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update event.');
-      }
+      if (error) throw error;
 
       console.log("Event updated successfully!");
       router.push(`/admin/events/${eventId}`);
 
     } catch (error) {
       console.error("Error updating event:", error);
+      alert(`Failed to update event: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -189,8 +194,6 @@ export default function EditEventPage() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            {/* ... form fields are identical to create page ... */}
-            {/* Event Name */}
             <FormField
               control={form.control}
               name="name"
@@ -205,7 +208,6 @@ export default function EditEventPage() {
               )}
             />
 
-            {/* Event Description */}
             <FormField
               control={form.control}
               name="description"
@@ -213,7 +215,7 @@ export default function EditEventPage() {
                 <FormItem>
                   <FormLabel>Event Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe the event, what participants will learn, prerequisites, etc." {...field} />
+                    <Textarea placeholder="Describe the event..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -233,16 +235,12 @@ export default function EditEventPage() {
                       onChange={(e) => field.onChange(e.target.files)}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Upload a new banner to replace the existing one. 16:9 aspect ratio recommended. Max size 10MB.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Event Date */}
               <FormField
                 control={form.control}
                 name="date"
@@ -257,7 +255,6 @@ export default function EditEventPage() {
                 )}
               />
 
-              {/* Event Time */}
               <FormField
                 control={form.control}
                 name="time"
@@ -274,7 +271,6 @@ export default function EditEventPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Event End Date */}
               <FormField
                 control={form.control}
                 name="endDate"
@@ -289,7 +285,6 @@ export default function EditEventPage() {
                 )}
               />
 
-              {/* Event End Time */}
               <FormField
                 control={form.control}
                 name="endTime"
@@ -305,7 +300,6 @@ export default function EditEventPage() {
               />
             </div>
 
-            {/* Venue */}
             <FormField
               control={form.control}
               name="venue"
@@ -313,7 +307,7 @@ export default function EditEventPage() {
                 <FormItem>
                   <FormLabel>Venue</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 'Seminar Hall' or 'Online'" {...field} />
+                    <Input placeholder="e.g., 'Seminar Hall'" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -321,22 +315,20 @@ export default function EditEventPage() {
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Registration Fee */}
                 <FormField
                 control={form.control}
-                name="registrationFee"
+                name="registration_fee"
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Registration Fee (in INR)</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="Enter 0 for free events" {...field} />
+                        <Input type="number" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
                 />
 
-                {/* Target Audience */}
                 <FormField
                 control={form.control}
                 name="audience"
@@ -352,7 +344,7 @@ export default function EditEventPage() {
                             <SelectContent>
                             <SelectItem value="iedc-members">IEDC Members Only</SelectItem>
                             <SelectItem value="carmel-students">All Carmel Students</SelectItem>
-                            <SelectItem value="all-students">All Students (including other colleges)</SelectItem>
+                            <SelectItem value="all-students">All Students</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -360,8 +352,8 @@ export default function EditEventPage() {
                 )}
                 />
             </div>
-
-            <FormField
+            
+             <FormField
               control={form.control}
               name="bypassTimeConstraint"
               render={({ field }) => (
@@ -370,9 +362,6 @@ export default function EditEventPage() {
                     <FormLabel className="text-base">
                       Bypass 24-hour Rule
                     </FormLabel>
-                    <FormDescription>
-                      Allow creating an event that starts in less than 24 hours.
-                    </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
@@ -383,19 +372,15 @@ export default function EditEventPage() {
                 </FormItem>
               )}
             />
-
-            <FormField
+             <FormField
               control={form.control}
               name="askForInstagram"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
                     <FormLabel className="text-base">
-                      Ask for Instagram Handle
+                       Ask for Instagram Handle
                     </FormLabel>
-                    <FormDescription>
-                      Add an optional field for attendees to enter their Instagram handle during registration.
-                    </FormDescription>
                   </div>
                   <FormControl>
                     <Switch

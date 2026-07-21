@@ -6,8 +6,9 @@ import { useTheme } from "next-themes";
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ArrowRight, Lightbulb, Wrench, Rocket, Sun, Moon, Users, Calendar, MapPin, Ticket } from 'lucide-react';
-import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+// import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore'; 
+// import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
@@ -15,8 +16,8 @@ function EventCard({ event }) {
   return (
     <Card className="transform border-border bg-card transition-transform duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10">
       <div className="relative h-48 w-full bg-secondary/50 rounded-t-lg flex items-center justify-center">
-        {event.bannerUrl ? (
-          <Image src={event.bannerUrl} alt={event.name} layout="fill" objectFit="cover"/>
+        {event.image_url || event.bannerUrl ? (
+          <Image src={event.image_url || event.bannerUrl} alt={event.name} layout="fill" objectFit="cover"/>
         ) : (
           <Ticket className="h-20 w-20 text-primary opacity-30"/>
         )}
@@ -25,7 +26,7 @@ function EventCard({ event }) {
         <CardTitle>{event.name}</CardTitle>
         <CardDescription className="flex items-center pt-1">
           <MapPin className="mr-2 h-4 w-4"/>
-          {event.venue} | {format(event.date.toDate(), 'PPP')}
+          {event.venue || event.location} | {format(new Date(event.date), 'PPP')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -46,27 +47,33 @@ export default function HomePage() {
   useEffect(() => {
     const fetchEvents = async () => {
       setIsLoading(true);
-      const now = Timestamp.now();
+      const now = new Date().toISOString();
 
-      // Fetch upcoming events
-      const upcomingQuery = query(
-        collection(db, "events"),
-        where("date", ">=", now),
-        orderBy("date", "asc")
-      );
-      const upcomingSnapshot = await getDocs(upcomingQuery);
-      setUpcomingEvents(upcomingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        // Fetch upcoming events
+        const { data: upcoming, error: upcomingError } = await supabase
+          .from('events')
+          .select('*')
+          .gte('date', now)
+          .order('date', { ascending: true });
+        
+        if (upcomingError) throw upcomingError;
+        setUpcomingEvents(upcoming || []);
 
-      // Fetch past events
-      const pastQuery = query(
-        collection(db, "events"),
-        where("date", "<", now),
-        orderBy("date", "desc")
-      );
-      const pastSnapshot = await getDocs(pastQuery);
-      setPastEvents(pastSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-      setIsLoading(false);
+        // Fetch past events
+        const { data: past, error: pastError } = await supabase
+          .from('events')
+          .select('*')
+          .lt('date', now)
+          .order('date', { ascending: false }); // Descending for past events
+        
+        if (pastError) throw pastError;
+        setPastEvents(past || []);
+      } catch (error) {
+         console.error("Error fetching events:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchEvents();

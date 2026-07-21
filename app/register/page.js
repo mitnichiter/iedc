@@ -1,19 +1,16 @@
-
 "use client";
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc } from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MultiSelect } from "@/components/ui/multi-select"; // Import our new component
+import { MultiSelect } from "@/components/ui/multi-select"; 
 
-// --- Interest Options ---
 const interestOptions = [
   { value: 'Photography', label: 'Photography' },
   { value: 'Videography', label: 'Videography' },
@@ -25,9 +22,8 @@ const interestOptions = [
   { value: 'Photo Editing', label: 'Photo Editing' },
   { value: 'Robotics', label: 'Robotics' },
   { value: 'Cybersecurity', label: 'Cybersecurity' },
-  { value: 'Other', label: 'Other' }, // The special "Other" option
+  { value: 'Other', label: 'Other' },
 ];
-
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -41,86 +37,22 @@ export default function RegisterPage() {
   const [department, setDepartment] = useState("");
   const [year, setYear] = useState("");
   const [semester, setSemester] = useState("");
-  const [registerNumber, setRegisterNumber] = useState(""); // <-- ADD THIS LINE
+  const [registerNumber, setRegisterNumber] = useState("");
   
-  // --- New states for interests ---
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [otherInterest, setOtherInterest] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [otp, setOtp] = useState(""); // <-- ADDED FOR OTP INPUT
-  const [otpSent, setOtpSent] = useState(false); // <-- ADDED TO TRACK OTP STATUS
-  const [otpVerified, setOtpVerified] = useState(false); // <-- ADDED TO TRACK OTP VERIFICATION
-  const [otpMessage, setOtpMessage] = useState(""); // <-- ADDED FOR OTP MESSAGES
-  const [otpError, setOtpError] = useState(""); // <-- ADDED FOR OTP ERRORS
-
-  const handleSendOtp = async () => {
-    if (!email) {
-      setOtpError("Please enter your email address.");
-      return;
-    }
-    setIsLoading(true);
-    setOtpMessage("");
-    setOtpError("");
-    try {
-      const response = await fetch('/api/auth/register/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to send OTP.");
-
-      setOtpMessage(result.message);
-      setOtpSent(true);
-    } catch (error) {
-      console.error("Send OTP error:", error);
-      setOtpError(error.message || "An error occurred while sending OTP.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otp) {
-      setOtpError("Please enter the OTP.");
-      return;
-    }
-    setIsLoading(true);
-    setOtpMessage("");
-    setOtpError("");
-    try {
-      const response = await fetch('/api/auth/register/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "OTP verification failed.");
-
-      setOtpMessage(result.message);
-      setOtpVerified(true);
-      setOtpSent(false);
-    } catch (error) {
-      console.error("Verify OTP error:", error);
-      setOtpError(error.message || "An error occurred during OTP verification.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleRegister = async () => {
-    if (!otpVerified) {
-      alert("Please verify your email address with OTP first.");
+    if (!email || !password || !fullName || !department || !year || !semester || !registerNumber) {
+      alert("Please fill out all required fields.");
       return;
     }
     if (password !== confirmPassword) {
       alert("Passwords do not match.");
       return;
     }
-    if (!email || !password || !fullName || !department || !year || !semester || !registerNumber) {
-      alert("Please fill out all required fields.");
-      return;
-    }
+
     setIsLoading(true);
 
     try {
@@ -129,30 +61,54 @@ export default function RegisterPage() {
         finalInterests.push(otherInterest);
       }
 
-      const userData = {
-        fullName,
+      // 1. Sign Up
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        dob,
-        phone,
-        address,
-        department,
-        year,
-        semester,
-        registerNumber,
-        interests: finalInterests,
-      };
-
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, userData }),
+        password,
+        options: {
+          data: {
+             full_name: fullName,
+          }
+        }
       });
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Registration failed.');
+      if (authError) throw authError;
 
-      alert('Registration successful! Your account is pending admin approval.');
-      router.push('/register/login');
+      // 2. Insert Profile
+      if (authData?.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: email,
+            full_name: fullName,
+            dob: dob,
+            phone: phone,
+            register_number: registerNumber,
+            department: department,
+            year: year,
+            semester: semester,
+            college: "Carmel Polytechnic College, Alappuzha",
+            interests: finalInterests,
+            role: 'student'
+          });
+
+        if (profileError) {
+             console.error("Profile creation error:", profileError);
+             // If already exists (e.g. from invite), update?
+             // For now just alert.
+             if (profileError.code === '23505') { // Unique violation
+                  alert("Profile already exists. Please login.");
+                  router.push('/register/login');
+                  return;
+             }
+             alert("Account created, but profile failed: " + profileError.message);
+        } else {
+             alert('Registration successful! Please check your email to confirm your account.');
+             router.push('/register/login');
+        }
+      }
+
     } catch (error) {
       console.error("Error during registration:", error);
       alert(`Registration failed: ${error.message}`);
@@ -172,47 +128,25 @@ export default function RegisterPage() {
   const isOtherInterestSelected = selectedInterests.includes('Other');
 
   return (
-  <main className="blueprint-background flex items-center justify-center min-h-screen bg-gray-100 dark:bg-[#000408] px-4 py-8 sm:px-6 lg:px-8">
-    <div>
-      <Card className="w-full max-w-full lg:min-w-[800px] lg:max-w-[900px] mx-auto px-4 shadow-lg rounded-2xl"> {/* <-- CHANGED LINE */}
+  <main className="flex items-center justify-center min-h-screen bg-background p-4 py-8">
+    <div className="w-full max-w-full lg:max-w-[900px]">
+      <Card className="shadow-lg rounded-2xl w-full"> 
         <CardHeader>
           <CardTitle className='text-xl sm:text-2xl'>IEDC Registration</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"> {/* <-- CHANGED LINE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
 
             {/* --- LEFT COLUMN --- */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullname">Full Name</Label>
-                <Input id="fullname" placeholder="Mitnic Hiter" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <Input id="fullname" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <div className="flex space-x-2">
-                  <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={otpSent || otpVerified} />
-                  {!otpSent && !otpVerified && (
-                    <Button type="button" onClick={handleSendOtp} disabled={isLoading || !email}>Send OTP</Button>
-                  )}
-                  {otpSent && !otpVerified && (
-                    <Button type="button" variant="outline" onClick={() => { setOtpSent(false); setOtp(""); setOtpMessage(""); setOtpError(""); setEmail(email); /* Keep email for resend if needed, or clear it: setEmail(""); */ }} disabled={isLoading}>Change Email</Button>
-                  )}
-                </div>
-                {otpMessage && <p className="text-sm text-green-600">{otpMessage}</p>}
-                {otpError && <p className="text-sm text-red-600">{otpError}</p>}
+                <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
-
-              {otpSent && !otpVerified && (
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Enter OTP</Label>
-                  <div className="flex space-x-2">
-                    <Input id="otp" type="text" placeholder="123456" value={otp} onChange={(e) => setOtp(e.target.value)} />
-                    <Button type="button" onClick={handleVerifyOtp} disabled={isLoading || !otp}>Verify OTP</Button>
-                  </div>
-                </div>
-              )}
-
-              {otpVerified && <p className="text-sm font-medium text-green-600">Email Verified Successfully!</p>}
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -282,7 +216,7 @@ export default function RegisterPage() {
             </div>
 
             {/* --- FULL WIDTH ROW FOR OTHER INTEREST --- */}
-            <div className="md:col-span-2 space-y-2"> {/* <-- MODIFIED LINE to span 2 columns on medium screens and up */}
+            <div className="md:col-span-2 space-y-2">
               <Label htmlFor="other-interest">If Other, please specify</Label>
               <Input
                 id="other-interest"
@@ -290,21 +224,21 @@ export default function RegisterPage() {
                 value={otherInterest}
                 onChange={(e) => setOtherInterest(e.target.value)}
                 disabled={!isOtherInterestSelected}
-                className={!isOtherInterestSelected ? "bg-gray-100 dark:bg-gray-800" : ""}
+                className={!isOtherInterestSelected ? "bg-muted" : ""}
               />
             </div>
-          </form>
+          </div>
         </CardContent>
         <CardFooter>
-          <Button className="w-full bg-orange-700" onClick={handleRegister} disabled={isLoading || !otpVerified}>
-            {isLoading ? 'Registering...' : 'Register'}
+          <Button className="w-full bg-orange-700 hover:bg-orange-800" onClick={handleRegister} disabled={isLoading}>
+            {isLoading ? 'Creating Account...' : 'Register'}
           </Button>
         </CardFooter>
       </Card>
 
-      <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+      <div className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{' '}
-        <Link href="/register/login" className="underline font-semibold">
+        <Link href="/register/login" className="underline font-semibold hover:text-primary">
           Sign in
         </Link>
       </div>

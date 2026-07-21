@@ -1,7 +1,7 @@
 "use client";
+
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +19,14 @@ export default function ResetPasswordPage() {
     setMessage("");
     setError("");
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/register/update-password`, // Make sure this page exists or redirect to a valid page
+      });
+      if (error) throw error;
       setMessage("Password reset email sent. Please check your inbox.");
     } catch (error) {
       console.error("Password Reset Error:", error);
-      setError("Error sending password reset email. Please try again.");
+      setError(error.message || "Error sending password reset email.");
     } finally {
       setIsLoading(false);
     }

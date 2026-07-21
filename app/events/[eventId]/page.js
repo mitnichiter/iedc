@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, MapPinIcon, IndianRupeeIcon, ArrowRight } from 'lucide-react';
 
 export default function PublicEventDetailsPage() {
@@ -27,11 +25,18 @@ export default function PublicEventDetailsPage() {
     const fetchEvent = async () => {
       setIsLoading(true);
       try {
-        const eventRef = doc(db, 'events', eventId);
-        const eventDoc = await getDoc(eventRef);
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', eventId)
+          .single();
 
-        if (eventDoc.exists()) {
-          setEvent({ id: eventDoc.id, ...eventDoc.data() });
+        if (error) {
+           throw error;
+        }
+
+        if (data) {
+          setEvent(data);
         } else {
           setError("Event not found.");
         }
@@ -63,13 +68,13 @@ export default function PublicEventDetailsPage() {
       <div className="container mx-auto px-4 py-12 md:py-20">
         <div className="max-w-4xl mx-auto">
           {/* Banner Image */}
-          {event.bannerUrl && (
+          {event.image_url && (
             <div className="relative w-full h-64 md:h-96 rounded-lg overflow-hidden shadow-lg mb-8">
               <Image
-                src={event.bannerUrl}
+                src={event.image_url}
                 alt={`${event.name} banner`}
-                layout="fill"
-                objectFit="cover"
+                fill
+                className="object-cover"
                 priority
               />
             </div>
@@ -89,21 +94,25 @@ export default function PublicEventDetailsPage() {
                     <CalendarIcon className="h-6 w-6 text-primary"/>
                     <div>
                         <p className="font-semibold">Date & Time</p>
-                        <p className="text-muted-foreground">{format(event.date.toDate(), 'EEEE, MMMM d, yyyy')} at {event.time}</p>
+                        {/* Event date stored as ISO string in Supabase */}
+                        <p className="text-muted-foreground">
+                            {format(new Date(event.date), 'EEEE, MMMM d, yyyy')}
+                            {/* Time might be separate or part of date depending on schema, assuming date has time or using generic format */}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <MapPinIcon className="h-6 w-6 text-primary"/>
                     <div>
                         <p className="font-semibold">Venue</p>
-                        <p className="text-muted-foreground">{event.venue}</p>
+                        <p className="text-muted-foreground">{event.location}</p>
                     </div>
                 </div>
                  <div className="flex items-center gap-4">
                     <IndianRupeeIcon className="h-6 w-6 text-primary"/>
                     <div>
                         <p className="font-semibold">Registration Fee</p>
-                        <p className="text-muted-foreground">{event.registrationFee > 0 ? `₹${event.registrationFee}` : 'Free'}</p>
+                        <p className="text-muted-foreground">{event.registration_fee > 0 ? `₹${event.registration_fee}` : 'Free'}</p>
                     </div>
                 </div>
             </div>

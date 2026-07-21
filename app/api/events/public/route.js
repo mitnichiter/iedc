@@ -1,27 +1,17 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
-import admin from 'firebase-admin';
+import { supabase } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic'; // Ensure fresh data
 
 export async function GET() {
   try {
-    const now = admin.firestore.Timestamp.now();
+    const { data: events, error } = await supabase
+      .from('events')
+      .select('*')
+      .gte('date', new Date().toISOString()) // Filter for future events
+      .order('date', { ascending: true });
 
-    const eventsSnapshot = await db.collection('events')
-      .where('date', '>=', now)
-      .orderBy('date', 'asc')
-      .get();
-
-    const events = eventsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            // Convert Firestore Timestamps to ISO strings for JSON serialization
-            date: data.date.toDate().toISOString(),
-            endDate: data.endDate ? data.endDate.toDate().toISOString() : null,
-            createdAt: data.createdAt.toDate().toISOString(),
-        };
-    });
+    if (error) throw error;
 
     return NextResponse.json(events);
   } catch (error) {

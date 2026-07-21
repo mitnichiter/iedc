@@ -1,17 +1,11 @@
-// File: app/admin/page.js
 "use client";
 
-// AdminRoute is now handled by app/admin/layout.js
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-// Icons like LayoutDashboard, Users, LogOut, ChevronLeft are now in layout.js
-// useRouter, signOut, auth for logout are now in layout.js
 
-
-// This is the content for the main admin dashboard page (/admin)
 const AdminDashboardContent = () => {
-  const { user } = useAuth(); // Still need useAuth for user-specific content like email
+  const { user } = useAuth();
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Admin Overview</h1>
@@ -37,8 +31,6 @@ const AdminDashboardContent = () => {
   );
 };
 
-// The AdminPage now directly exports the content.
-// AdminRoute and AdminLayout are applied by app/admin/layout.js
 const AdminPage = () => {
   return (
     <AdminDashboardContent />

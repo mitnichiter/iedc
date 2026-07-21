@@ -5,9 +5,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { supabase } from "@/lib/supabase"; // Supabase Client
+// import { auth, db } from "@/lib/firebase"; // Deprecated
+// import { signOut } from "firebase/auth"; // Deprecated
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -24,38 +24,56 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  const [error, setError] = useState(null);
+
   useEffect(
     () => {
       const fetchPageData = async () => {
         setIsLoading(true);
+        setError(null);
         let userRole = 'public';
         let profile = null;
 
-        if (user) {
-          const userDocRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(userDocRef);
-          if (docSnap.exists()) {
-            profile = docSnap.data();
-            setUserProfile(profile);
-            // Determine role from profile
-            if (profile.college === 'Carmel Polytechnic College, Alappuzha') {
-              userRole = 'carmel';
+        try {
+          if (user) {
+            console.log("Fetching user profile for:", user.id); // Supabase user.id
+            const { data, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            
+            if (profileError) throw profileError;
+
+            if (data) {
+              setUserProfile(data);
+              // Determine role from profile
+              if (data.college === 'Carmel Polytechnic College, Alappuzha') {
+                userRole = 'carmel';
+              }
+            } else {
+              console.warn("No profile document found for this user!");
             }
-          } else {
-            console.error("No profile document found for this user!");
           }
+        } catch (err) {
+            console.error("Critical Error fetching profile:", err);
+            setError(err.message || "Failed to load profile data.");
         }
 
         // Now fetch events
         try {
-          const response = await fetch('/api/events/public');
-          if (!response.ok) {
-            throw new Error('Failed to fetch events.');
-          }
-          const data = await response.json();
-          setUpcomingEvents(data);
+          // Direct Supabase query (faster than API route for client usage, or keep API if preferred)
+          // Switching to direct query as per migration plan efficiency
+          const { data, error: eventsError } = await supabase
+            .from('events')
+            .select('*')
+            .order('date', { ascending: true }); // Assuming 'date' column
+
+          if (eventsError) throw eventsError;
+          setUpcomingEvents(data || []);
         } catch (error) {
           console.error("Error fetching upcoming events:", error);
+          // Events error is non-critical
         } finally {
           setIsLoading(false);
         }
@@ -68,7 +86,7 @@ const DashboardPage = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
       router.push("/");
     } catch (error) {
       console.error("Failed to log out:", error);
@@ -153,10 +171,27 @@ const DashboardPage = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background p-4 text-center">
+        <h2 className="text-xl font-bold text-red-500 mb-2">Something went wrong</h2>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <p className="text-sm text-muted-foreground mb-6">
+            This might be due to a network issue or a problem with your account permissions.
+        </p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
+        <div className="mt-8">
+             <Button onClick={handleLogout} variant="outline">Logout</Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!userProfile) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        Could not load profile data.
+      <div className="flex flex-col items-center justify-center h-screen bg-background">
+        <p className="mb-4">Could not load profile data.</p>
+        <Button onClick={handleLogout} variant="outline">Logout</Button>
       </div>
     );
   }

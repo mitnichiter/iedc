@@ -6,12 +6,11 @@ import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { LayoutDashboard, Users, LogOut, ChevronLeft, UserCog, Menu, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import AdminRoute from "@/components/auth/AdminRoute";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Added Sheet components
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
-// This is the AdminLayout component, moved from app/admin/page.js
+// This is the AdminLayout component
 const AdminPanelLayout = ({ children }) => {
   const { user } = useAuth(); // Get the authenticated user to check their role
   const router = useRouter();
@@ -19,7 +18,7 @@ const AdminPanelLayout = ({ children }) => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
       router.push("/"); // Redirect to homepage or login after logout
     } catch (error) {
       console.error("Admin logout failed:", error);

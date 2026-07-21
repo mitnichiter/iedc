@@ -1,62 +1,57 @@
-// File: components/auth/AdminRoute.js
 "use client";
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 const AdminRoute = ({ children }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(true);
+  const [checkingRole, setCheckingRole] = useState(true);
 
   useEffect(() => {
-    // Don't do anything while auth is loading
-    if (authLoading) {
-      return;
-    }
+    const checkAdmin = async () => {
+      // 1. Wait for AuthContext loading
+      if (loading) return;
 
-    // If auth is done and there's no user, redirect immediately
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    // If we have a user, check their role in Firestore
-    const verifyAdminStatus = async () => {
-      const userDocRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(userDocRef);
-      
-      // Reverted: Check if the role is 'admin'
-      if (docSnap.exists() && docSnap.data().role === 'admin') {
-        setIsAdmin(true);
-      } else {
-        // Not an admin, redirect them to their user dashboard
-        console.warn("Access Denied: User is not an admin.");
-        router.push('/dashboard');
+      // 2. If no user, redirect to login
+      if (!user) {
+        router.push('/register/login');
+        return;
       }
-      setIsVerifying(false);
+
+      try {
+        // 3. Check role in profiles table
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (data && data.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          console.warn('User is not admin:', user.email);
+          router.push('/dashboard');
+        }
+      } catch (err) {
+        console.error("Admin check failed", err);
+        router.push('/dashboard');
+      } finally {
+        setCheckingRole(false);
+      }
     };
 
-    verifyAdminStatus();
+    checkAdmin();
+  }, [user, loading, router]);
 
-  }, [user, authLoading, router]);
-
-  // Show a loading screen while we verify the admin role
-  if (isVerifying) {
-    return <div className="flex items-center justify-center h-screen">Verifying Admin Access...</div>;
+  if (loading || checkingRole) {
+    return <div className="flex h-screen items-center justify-center">Verifying Admin Access...</div>;
   }
 
-  // If verification is done and they are an admin, show the admin page
-  if (isAdmin) {
-    return <>{children}</>;
-  }
-
-  // Otherwise, render nothing as a fallback while redirecting
-  return null;
+  return isAdmin ? <>{children}</> : null;
 };
 
 export default AdminRoute;
